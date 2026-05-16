@@ -1,0 +1,225 @@
+#!/usr/bin/env node
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import * as z from "zod/v4";
+import { loadProfile } from "./parser.js";
+import {
+  getRenderSummary,
+  findSpuriousRenders,
+  getHottestComponents,
+  traceRenderCascade,
+  suggestMemoization,
+} from "./analyzer.js";
+
+const server = new McpServer({
+  name: "react-render-profile-mcp",
+  version: "0.1.0",
+});
+
+function errorResponse(err: unknown) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+      },
+    ],
+    isError: true,
+  };
+}
+
+server.registerTool(
+  "get_render_summary",
+  {
+    description:
+      "Returns a high-level overview of a React DevTools Profiler export: total commits, total render time, " +
+      "top 5 slowest components by self time, and total spurious (wasted) render count. " +
+      "Use this first to understand the scale of the performance problem before drilling into specifics.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+    },
+  },
+  async ({ profile_path }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(getRenderSummary(data), null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "find_spurious_renders",
+  {
+    description:
+      "Finds React components that re-rendered without any meaningful prop, state, context, or hook changes. " +
+      "These are wasted renders caused by unstable references (inline objects/functions/arrays) passed from a parent. " +
+      "Returns component name, total render count, spurious count, and wasted milliseconds. " +
+      "Use to identify the highest-ROI targets for React.memo.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      min_render_count: z
+        .number()
+        .optional()
+        .describe(
+          "Only include components with at least this many total renders (default: 1)",
+        ),
+    },
+  },
+  async ({ profile_path, min_render_count }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              findSpuriousRenders(data, min_render_count),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_hottest_components",
+  {
+    description:
+      "Returns the top N React components ranked by self CPU time (excluding children) across the entire profiling session. " +
+      "Includes total self ms, average per render, and percentage of total profile time. " +
+      "Use to find which components are the most expensive to render, regardless of cause.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      top_n: z
+        .number()
+        .optional()
+        .describe("Number of components to return (default: 10)"),
+    },
+  },
+  async ({ profile_path, top_n }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(getHottestComponents(data, top_n), null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "trace_render_cascade",
+  {
+    description:
+      "For a specific React commit (render cycle), shows what triggered it and lists every component " +
+      "that re-rendered as a result, sorted by actual duration descending. " +
+      "Reveals propagation — e.g. a context update cascading into 40 children. " +
+      "Call get_render_summary first to find total_commits, then use 0-based commit_index.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      commit_index: z
+        .number()
+        .describe("Zero-based index of the commit to inspect"),
+    },
+  },
+  async ({ profile_path, commit_index }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              traceRenderCascade(data, commit_index),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "suggest_memoization",
+  {
+    description:
+      "Analyzes the profiling data and returns concrete memoization suggestions. " +
+      "Currently detects React.memo candidates: components with spurious renders above the wasted ms threshold. " +
+      "Each suggestion explains why the component re-renders unnecessarily and what to do about it.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      min_wasted_ms: z
+        .number()
+        .optional()
+        .describe(
+          "Only suggest for components wasting more than this many ms total (default: 0)",
+        ),
+    },
+  },
+  async ({ profile_path, min_wasted_ms }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              suggestMemoization(data, min_wasted_ms),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
