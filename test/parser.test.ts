@@ -10,7 +10,10 @@ import {
   suggestMemoization,
 } from "../src/analyzer.js";
 
-const FIXTURE = resolve(fileURLToPath(import.meta.url), "../../test/fixtures/basic.profile.json");
+const FIXTURE = resolve(
+  fileURLToPath(import.meta.url),
+  "../../test/fixtures/basic.profile.json",
+);
 
 describe("loadProfile", () => {
   it("loads and parses the profile", async () => {
@@ -39,7 +42,9 @@ describe("loadProfile", () => {
     const { writeFile, unlink } = await import("fs/promises");
     const tmp = "/tmp/bad-version.json";
     await writeFile(tmp, JSON.stringify({ version: 4, dataForRoots: [] }));
-    await expect(loadProfile(tmp)).rejects.toThrow("Unsupported profile version: 4");
+    await expect(loadProfile(tmp)).rejects.toThrow(
+      "Unsupported profile version: 4",
+    );
     await unlink(tmp);
   });
 });
@@ -57,7 +62,9 @@ describe("findSpuriousRenders", () => {
   it("does not flag SearchInput as spurious (hook changed)", async () => {
     const data = await loadProfile(FIXTURE);
     const result = findSpuriousRenders(data);
-    expect(result.spurious_renders.find((r) => r.component === "SearchInput")).toBeUndefined();
+    expect(
+      result.spurious_renders.find((r) => r.component === "SearchInput"),
+    ).toBeUndefined();
   });
 
   it("respects min_render_count filter", async () => {

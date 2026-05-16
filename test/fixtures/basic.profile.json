@@ -5,56 +5,183 @@
       "commitData": [
         {
           "changeDescriptions": [
-            [3, { "context": false, "didHooksChange": false, "isFirstMount": true, "props": null, "state": null, "hooks": null }],
-            [4, { "context": false, "didHooksChange": false, "isFirstMount": true, "props": null, "state": null, "hooks": null }],
-            [5, { "context": false, "didHooksChange": false, "isFirstMount": true, "props": null, "state": null, "hooks": null }]
+            [
+              3,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              5,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ]
           ],
           "duration": 15.2,
           "effectDuration": 0.5,
-          "fiberActualDurations": [[3, 15.2], [4, 8.1], [5, 3.2]],
-          "fiberSelfDurations": [[3, 3.9], [4, 4.9], [5, 3.2]],
+          "fiberActualDurations": [
+            [3, 15.2],
+            [4, 8.1],
+            [5, 3.2]
+          ],
+          "fiberSelfDurations": [
+            [3, 3.9],
+            [4, 4.9],
+            [5, 3.2]
+          ],
           "passiveEffectDuration": 0.1,
           "priorityLevel": "Normal",
           "timestamp": 100.0,
-          "updaters": [{ "displayName": "App", "id": 3, "key": null, "type": 5 }]
+          "updaters": [
+            { "displayName": "App", "id": 3, "key": null, "type": 5 }
+          ]
         },
         {
           "changeDescriptions": [
-            [4, { "context": false, "didHooksChange": false, "isFirstMount": false, "props": [], "state": null, "hooks": null }],
-            [5, { "context": false, "didHooksChange": true, "isFirstMount": false, "props": ["value"], "state": null, "hooks": [0] }]
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              5,
+              {
+                "context": false,
+                "didHooksChange": true,
+                "isFirstMount": false,
+                "props": ["value"],
+                "state": null,
+                "hooks": [0]
+              }
+            ]
           ],
           "duration": 8.5,
           "effectDuration": 0.1,
-          "fiberActualDurations": [[4, 4.8], [5, 3.5]],
-          "fiberSelfDurations": [[4, 4.8], [5, 3.5]],
+          "fiberActualDurations": [
+            [4, 4.8],
+            [5, 3.5]
+          ],
+          "fiberSelfDurations": [
+            [4, 4.8],
+            [5, 3.5]
+          ],
           "passiveEffectDuration": 0.0,
           "priorityLevel": "Normal",
           "timestamp": 200.0,
-          "updaters": [{ "displayName": "SearchInput", "id": 5, "key": null, "type": 5 }]
+          "updaters": [
+            { "displayName": "SearchInput", "id": 5, "key": null, "type": 5 }
+          ]
         },
         {
           "changeDescriptions": [
-            [4, { "context": false, "didHooksChange": false, "isFirstMount": false, "props": [], "state": null, "hooks": null }],
-            [5, { "context": false, "didHooksChange": true, "isFirstMount": false, "props": ["value"], "state": null, "hooks": [0] }]
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              5,
+              {
+                "context": false,
+                "didHooksChange": true,
+                "isFirstMount": false,
+                "props": ["value"],
+                "state": null,
+                "hooks": [0]
+              }
+            ]
           ],
           "duration": 7.1,
           "effectDuration": 0.1,
-          "fiberActualDurations": [[4, 3.9], [5, 3.1]],
-          "fiberSelfDurations": [[4, 3.9], [5, 3.1]],
+          "fiberActualDurations": [
+            [4, 3.9],
+            [5, 3.1]
+          ],
+          "fiberSelfDurations": [
+            [4, 3.9],
+            [5, 3.1]
+          ],
           "passiveEffectDuration": 0.0,
           "priorityLevel": "Normal",
           "timestamp": 350.0,
-          "updaters": [{ "displayName": "SearchInput", "id": 5, "key": null, "type": 5 }]
+          "updaters": [
+            { "displayName": "SearchInput", "id": 5, "key": null, "type": 5 }
+          ]
         }
       ],
       "displayName": "App",
-      "initialTreeBaseDurations": [[3, 15.2], [4, 8.1], [5, 3.2]],
+      "initialTreeBaseDurations": [
+        [3, 15.2],
+        [4, 8.1],
+        [5, 3.2]
+      ],
       "operations": [],
       "rootID": 1,
       "snapshots": [
-        [3, { "id": 3, "children": [4, 5], "displayName": "App", "key": null, "parentID": 1 }],
-        [4, { "id": 4, "children": [], "displayName": "ProductList", "key": null, "parentID": 3 }],
-        [5, { "id": 5, "children": [], "displayName": "SearchInput", "key": null, "parentID": 3 }]
+        [
+          3,
+          {
+            "id": 3,
+            "children": [4, 5],
+            "displayName": "App",
+            "key": null,
+            "parentID": 1
+          }
+        ],
+        [
+          4,
+          {
+            "id": 4,
+            "children": [],
+            "displayName": "ProductList",
+            "key": null,
+            "parentID": 3
+          }
+        ],
+        [
+          5,
+          {
+            "id": 5,
+            "children": [],
+            "displayName": "SearchInput",
+            "key": null,
+            "parentID": 3
+          }
+        ]
       ]
     }
   ]
