@@ -5,6 +5,7 @@ import type {
   ProfileRoot,
   ProfileCommit,
   ComponentMetrics,
+  ChangeDescription,
   ChangeReason,
   ProfileData,
 } from "./types.js";
@@ -206,6 +207,23 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
     throw new Error(
       `Unsupported profile version: ${profile.version}. Only React DevTools Profiler export version 5 is supported.`,
     );
+  }
+
+  // Real DevTools exports serialize changeDescriptions as [[fiberID, desc], ...] (Map.entries()).
+  // Normalize to Record<string, ChangeDescription> so the rest of the code is uniform.
+  for (const root of profile.dataForRoots) {
+    for (const commit of root.commitData) {
+      if (Array.isArray(commit.changeDescriptions)) {
+        const record: Record<string, ChangeDescription> = {};
+        for (const [id, desc] of commit.changeDescriptions as unknown as [
+          number,
+          ChangeDescription,
+        ][]) {
+          record[String(id)] = desc;
+        }
+        commit.changeDescriptions = record;
+      }
+    }
   }
 
   const allCommits: ProfileCommit[] = [];
