@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.vola-trebla/react-render-profile-mcp",
-  "description": "MCP server that decodes React DevTools Profiler exports into actionable render summaries for AI agents",
+  "description": "Decodes React DevTools Profiler exports into render summaries and memoization advice for AI agents.",
   "repository": {
     "url": "https://github.com/vola-trebla/react-render-profile-mcp",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "react-render-profile-mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": {
         "type": "stdio"
       }
