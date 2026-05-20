@@ -50,13 +50,16 @@ describe("loadProfile", () => {
 });
 
 describe("findSpuriousRenders", () => {
-  it("detects ProductList as spurious (props: [] in real format)", async () => {
+  it("detects ProductList as UNSTABLE_PARENT_REF (props: [] in real format)", async () => {
     const data = await loadProfile(FIXTURE);
     const result = findSpuriousRenders(data);
     expect(result.spurious_renders).toHaveLength(1);
-    expect(result.spurious_renders[0].component).toBe("ProductList");
-    expect(result.spurious_renders[0].spurious_count).toBe(2);
-    expect(result.spurious_renders[0].wasted_ms).toBeGreaterThan(0);
+    const entry = result.spurious_renders[0];
+    expect(entry.component).toBe("ProductList");
+    expect(entry.spurious_count).toBe(2);
+    expect(entry.wasted_ms).toBeGreaterThan(0);
+    expect(entry.render_trigger).toBe("UNSTABLE_PARENT_REF");
+    expect(entry.recommendation).toContain("React.memo");
   });
 
   it("does not flag SearchInput as spurious (hook changed)", async () => {
@@ -65,6 +68,68 @@ describe("findSpuriousRenders", () => {
     expect(
       result.spurious_renders.find((r) => r.component === "SearchInput"),
     ).toBeUndefined();
+  });
+
+  it("detects CONTEXT_UPDATE renders as separate trigger category", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/context-render.profile.json";
+    const fixture = {
+      version: 5,
+      dataForRoots: [
+        {
+          commitData: [
+            {
+              changeDescriptions: [
+                [
+                  6,
+                  {
+                    context: true,
+                    didHooksChange: false,
+                    isFirstMount: false,
+                    props: null,
+                    state: null,
+                    hooks: null,
+                  },
+                ],
+              ],
+              duration: 5.0,
+              effectDuration: 0,
+              fiberActualDurations: [[6, 5.0]],
+              fiberSelfDurations: [[6, 5.0]],
+              passiveEffectDuration: 0,
+              priorityLevel: "Normal",
+              timestamp: 100,
+              updaters: [],
+            },
+          ],
+          displayName: "App",
+          initialTreeBaseDurations: [[6, 5.0]],
+          operations: [],
+          rootID: 1,
+          snapshots: [
+            [
+              6,
+              {
+                id: 6,
+                children: [],
+                displayName: "ThemeConsumer",
+                key: null,
+                parentID: 3,
+              },
+            ],
+          ],
+        },
+      ],
+    };
+    await writeFile(tmp, JSON.stringify(fixture));
+    const data = await loadProfile(tmp);
+    const result = findSpuriousRenders(data);
+    expect(result.spurious_renders).toHaveLength(1);
+    const entry = result.spurious_renders[0];
+    expect(entry.component).toBe("ThemeConsumer");
+    expect(entry.render_trigger).toBe("CONTEXT_UPDATE");
+    expect(entry.recommendation).toContain("React.memo cannot help");
+    await unlink(tmp);
   });
 
   it("respects min_render_count filter", async () => {

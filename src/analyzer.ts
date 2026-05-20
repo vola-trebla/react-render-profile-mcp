@@ -47,21 +47,44 @@ export function findSpuriousRenders(
   data: ProfileData,
   minRenderCount = 1,
 ): SpuriousRendersResult {
-  const spurious = data.metrics
-    .filter((m) => m.spuriousRenderCount > 0 && m.renderCount >= minRenderCount)
-    .sort((a, b) => b.spuriousWastedMs - a.spuriousWastedMs);
+  type Entry = SpuriousRendersResult["spurious_renders"][number];
 
-  return {
-    total_commits: data.totalCommits,
-    spurious_renders: spurious.map((m) => ({
+  const propEntries: Entry[] = data.metrics
+    .filter((m) => m.spuriousRenderCount > 0 && m.renderCount >= minRenderCount)
+    .map((m) => ({
       component: m.name,
       render_count: m.renderCount,
       spurious_count: m.spuriousRenderCount,
       wasted_ms: round(m.spuriousWastedMs),
-      reason:
-        "props reference changed but no prop keys differed — unstable object/function/array from parent",
-    })),
-  };
+      render_trigger: "UNSTABLE_PARENT_REF" as const,
+      recommendation:
+        "Wrap with React.memo — re-renders are driven by unstable object/function/array references from the parent. React.memo will skip them when props are shallowly equal.",
+    }));
+
+  // Context updates bypass React.memo entirely — surface them separately so the
+  // agent recommends the correct fix (stabilize the context value, not memo the consumer).
+  const contextEntries: Entry[] = data.metrics
+    .filter(
+      (m) =>
+        m.contextRenderCount > 0 &&
+        m.spuriousRenderCount === 0 &&
+        m.renderCount >= minRenderCount,
+    )
+    .map((m) => ({
+      component: m.name,
+      render_count: m.renderCount,
+      spurious_count: m.contextRenderCount,
+      wasted_ms: round(m.contextWastedMs),
+      render_trigger: "CONTEXT_UPDATE" as const,
+      recommendation:
+        "React.memo cannot help here — context updates bypass memo. Stabilize the context value with useMemo, or split the context so consumers only subscribe to the slice they use.",
+    }));
+
+  const combined = [...propEntries, ...contextEntries].sort(
+    (a, b) => b.wasted_ms - a.wasted_ms,
+  );
+
+  return { total_commits: data.totalCommits, spurious_renders: combined };
 }
 
 export function getHottestComponents(

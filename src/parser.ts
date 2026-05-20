@@ -199,6 +199,8 @@ function aggregateMetrics(
           avgSelfMs: 0,
           spuriousRenderCount: 0,
           spuriousWastedMs: 0,
+          contextRenderCount: 0,
+          contextWastedMs: 0,
           changeReasons: [],
         });
       }
@@ -216,6 +218,10 @@ function aggregateMetrics(
       if (isSpurious(fiberID, commit)) {
         m.spuriousRenderCount++;
         m.spuriousWastedMs += selfMs;
+      }
+      if (desc?.context) {
+        m.contextRenderCount++;
+        m.contextWastedMs += selfMs;
       }
     }
   }
@@ -274,6 +280,8 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
         existing.totalActualMs += m.totalActualMs;
         existing.spuriousRenderCount += m.spuriousRenderCount;
         existing.spuriousWastedMs += m.spuriousWastedMs;
+        existing.contextRenderCount += m.contextRenderCount;
+        existing.contextWastedMs += m.contextWastedMs;
         existing.changeReasons.push(...m.changeReasons);
         existing.avgSelfMs = existing.totalSelfMs / existing.renderCount;
       } else {
