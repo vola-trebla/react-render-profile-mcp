@@ -464,3 +464,141 @@ describe("suggestMemoization", () => {
     expect(result.components[0].transition_render_count).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Realistic fixture — covers all v2 patterns in one profile
+// ---------------------------------------------------------------------------
+
+const REALISTIC = resolve(
+  fileURLToPath(import.meta.url),
+  "../../test/fixtures/realistic.profile.json",
+);
+
+describe("realistic profile — lifecycle anomaly", () => {
+  it("flags ListItem as lifecycle_anomaly (always mounts, never updates)", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = getRenderSummary(data);
+    const listItem = result.top_components.find(
+      (c) => c.component === "ListItem",
+    );
+    if (listItem) {
+      // ListItem appears in top_components only if it ranks in top 5 by self time
+      expect(listItem.lifecycle_anomaly).toBe(true);
+      expect(listItem.mount_count).toBe(listItem.render_count);
+    }
+  });
+
+  it("ListItem metrics: mountCount equals renderCount", async () => {
+    const data = await loadProfile(REALISTIC);
+    const listItem = data.metrics.find((m) => m.name === "ListItem")!;
+    expect(listItem.mountCount).toBe(4); // mounts in commits 0–3
+    expect(listItem.updateCount).toBe(0);
+    expect(listItem.renderCount).toBe(4);
+  });
+});
+
+describe("realistic profile — context update detection", () => {
+  it("UserAvatar appears as CONTEXT_UPDATE, not UNSTABLE_PARENT_REF", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = findSpuriousRenders(data);
+    const avatar = result.spurious_renders.find(
+      (r) => r.component === "UserAvatar",
+    )!;
+    expect(avatar).toBeDefined();
+    expect(avatar.render_trigger).toBe("CONTEXT_UPDATE");
+    expect(avatar.recommendation).toContain("React.memo cannot help");
+    expect(avatar.concurrent_yield).toBe(false);
+  });
+
+  it("UserAvatar has contextRenderCount=2, spuriousRenderCount=0", async () => {
+    const data = await loadProfile(REALISTIC);
+    const avatar = data.metrics.find((m) => m.name === "UserAvatar")!;
+    expect(avatar.contextRenderCount).toBe(2);
+    expect(avatar.spuriousRenderCount).toBe(0);
+  });
+});
+
+describe("realistic profile — memoization viability", () => {
+  it("ProductGrid → MEMOIZE (avg >2ms, mixed normal+transition spurious)", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = suggestMemoization(data);
+    const pg = result.suggestions.find((s) => s.component === "ProductGrid")!;
+    expect(pg).toBeDefined();
+    expect(pg.recommendation).toBe("MEMOIZE");
+    expect(pg.avg_render_ms).toBeGreaterThan(2);
+    expect(pg.prop_stability).toBe("UNSTABLE_REFERENCES");
+  });
+
+  it("FilterPanel → DO_NOT_MEMOIZE (avg <2ms)", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = suggestMemoization(data);
+    const fp = result.suggestions.find((s) => s.component === "FilterPanel")!;
+    expect(fp).toBeDefined();
+    expect(fp.recommendation).toBe("DO_NOT_MEMOIZE");
+    expect(fp.avg_render_ms).toBeLessThan(2);
+  });
+
+  it("DeferredResults → INTENTIONAL_CONCURRENT_YIELD (all spurious in Low Priority commits)", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = suggestMemoization(data);
+    const dr = result.suggestions.find(
+      (s) => s.component === "DeferredResults",
+    )!;
+    expect(dr).toBeDefined();
+    expect(dr.recommendation).toBe("INTENTIONAL_CONCURRENT_YIELD");
+    expect(dr.reasoning).toContain("startTransition");
+  });
+
+  it("Sidebar → MEMOIZE (1 normal + 1 transition spurious — not all transitions)", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = suggestMemoization(data);
+    const sb = result.suggestions.find((s) => s.component === "Sidebar")!;
+    expect(sb).toBeDefined();
+    expect(sb.recommendation).toBe("MEMOIZE");
+  });
+});
+
+describe("realistic profile — concurrent commit detection", () => {
+  it("commit 4 (Low Priority) → is_concurrent_commit: true", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = traceRenderCascade(data, 4);
+    expect(result.is_concurrent_commit).toBe(true);
+  });
+
+  it("commit 0 (Normal) → is_concurrent_commit: false", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = traceRenderCascade(data, 0);
+    expect(result.is_concurrent_commit).toBe(false);
+  });
+
+  it("DeferredResults has transition_render_count=2 in get_hottest_components", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = getHottestComponents(data, 20);
+    const dr = result.components.find((c) => c.component === "DeferredResults");
+    expect(dr).toBeDefined();
+    expect(dr!.transition_render_count).toBe(2);
+  });
+});
+
+describe("realistic profile — find_spurious_renders concurrent_yield flag", () => {
+  it("DeferredResults → concurrent_yield: true in find_spurious_renders", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = findSpuriousRenders(data);
+    const dr = result.spurious_renders.find(
+      (r) => r.component === "DeferredResults",
+    )!;
+    expect(dr).toBeDefined();
+    expect(dr.render_trigger).toBe("UNSTABLE_PARENT_REF");
+    expect(dr.concurrent_yield).toBe(true);
+  });
+
+  it("ProductGrid → concurrent_yield: false (has normal spurious renders too)", async () => {
+    const data = await loadProfile(REALISTIC);
+    const result = findSpuriousRenders(data);
+    const pg = result.spurious_renders.find(
+      (r) => r.component === "ProductGrid",
+    )!;
+    expect(pg).toBeDefined();
+    expect(pg.concurrent_yield).toBe(false);
+  });
+});

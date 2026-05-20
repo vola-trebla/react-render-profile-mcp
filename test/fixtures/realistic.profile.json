@@ -1,0 +1,571 @@
+{
+  "version": 5,
+  "dataForRoots": [
+    {
+      "displayName": "App",
+      "rootID": 1,
+      "initialTreeBaseDurations": [
+        [2, 45.0],
+        [3, 8.0],
+        [4, 2.5],
+        [5, 0.8],
+        [6, 2.1],
+        [7, 1.5],
+        [8, 0.1],
+        [9, 3.0],
+        [10, 0.5]
+      ],
+      "operations": [],
+      "snapshots": [
+        [
+          2,
+          {
+            "id": 2,
+            "children": [3, 4, 5, 9],
+            "displayName": "App",
+            "key": null,
+            "parentID": 1
+          }
+        ],
+        [
+          3,
+          {
+            "id": 3,
+            "children": [7],
+            "displayName": "ProductGrid",
+            "key": null,
+            "parentID": 2
+          }
+        ],
+        [
+          4,
+          {
+            "id": 4,
+            "children": [10],
+            "displayName": "SearchBar",
+            "key": null,
+            "parentID": 2
+          }
+        ],
+        [
+          5,
+          {
+            "id": 5,
+            "children": [6, 8],
+            "displayName": "ThemeProvider",
+            "key": null,
+            "parentID": 2
+          }
+        ],
+        [
+          6,
+          {
+            "id": 6,
+            "children": [],
+            "displayName": "UserAvatar",
+            "key": null,
+            "parentID": 5
+          }
+        ],
+        [
+          7,
+          {
+            "id": 7,
+            "children": [],
+            "displayName": "ListItem",
+            "key": null,
+            "parentID": 3
+          }
+        ],
+        [
+          8,
+          {
+            "id": 8,
+            "children": [],
+            "displayName": "DeferredResults",
+            "key": null,
+            "parentID": 5
+          }
+        ],
+        [
+          9,
+          {
+            "id": 9,
+            "children": [],
+            "displayName": "Sidebar",
+            "key": null,
+            "parentID": 2
+          }
+        ],
+        [
+          10,
+          {
+            "id": 10,
+            "children": [],
+            "displayName": "FilterPanel",
+            "key": null,
+            "parentID": 4
+          }
+        ]
+      ],
+      "commitData": [
+        {
+          "changeDescriptions": [
+            [
+              2,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              3,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              5,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              6,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              7,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              8,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              9,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              10,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ]
+          ],
+          "duration": 45.2,
+          "effectDuration": 2.0,
+          "passiveEffectDuration": 0.5,
+          "priorityLevel": "Normal",
+          "timestamp": 100,
+          "updaters": [
+            { "displayName": "App", "id": 2, "key": null, "type": 5 }
+          ],
+          "fiberActualDurations": [
+            [2, 45.2],
+            [3, 9.5],
+            [4, 3.0],
+            [5, 3.0],
+            [6, 2.1],
+            [7, 1.5],
+            [8, 0.1],
+            [9, 3.0],
+            [10, 0.5]
+          ],
+          "fiberSelfDurations": [
+            [2, 1.2],
+            [3, 8.0],
+            [4, 2.5],
+            [5, 0.8],
+            [6, 2.1],
+            [7, 1.5],
+            [8, 0.1],
+            [9, 3.0],
+            [10, 0.5]
+          ]
+        },
+        {
+          "changeDescriptions": [
+            [
+              3,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": true,
+                "isFirstMount": false,
+                "props": ["value"],
+                "state": null,
+                "hooks": [0]
+              }
+            ],
+            [
+              6,
+              {
+                "context": true,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              7,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              9,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              10,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ]
+          ],
+          "duration": 14.5,
+          "effectDuration": 0.1,
+          "passiveEffectDuration": 0.0,
+          "priorityLevel": "Normal",
+          "timestamp": 350,
+          "updaters": [
+            { "displayName": "SearchBar", "id": 4, "key": null, "type": 5 }
+          ],
+          "fiberActualDurations": [
+            [3, 4.6],
+            [4, 2.7],
+            [6, 2.2],
+            [7, 1.4],
+            [9, 2.8],
+            [10, 0.4]
+          ],
+          "fiberSelfDurations": [
+            [3, 3.2],
+            [4, 2.3],
+            [6, 2.2],
+            [7, 1.4],
+            [9, 2.8],
+            [10, 0.4]
+          ]
+        },
+        {
+          "changeDescriptions": [
+            [
+              3,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": true,
+                "isFirstMount": false,
+                "props": ["value"],
+                "state": null,
+                "hooks": [0]
+              }
+            ],
+            [
+              6,
+              {
+                "context": true,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              7,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              10,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ]
+          ],
+          "duration": 12.1,
+          "effectDuration": 0.1,
+          "passiveEffectDuration": 0.0,
+          "priorityLevel": "Normal",
+          "timestamp": 600,
+          "updaters": [
+            { "displayName": "SearchBar", "id": 4, "key": null, "type": 5 }
+          ],
+          "fiberActualDurations": [
+            [3, 4.4],
+            [4, 2.7],
+            [6, 2.0],
+            [7, 1.5],
+            [10, 0.5]
+          ],
+          "fiberSelfDurations": [
+            [3, 2.9],
+            [4, 2.2],
+            [6, 2.0],
+            [7, 1.5],
+            [10, 0.5]
+          ]
+        },
+        {
+          "changeDescriptions": [
+            [
+              3,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              4,
+              {
+                "context": false,
+                "didHooksChange": true,
+                "isFirstMount": false,
+                "props": ["value"],
+                "state": null,
+                "hooks": [0]
+              }
+            ],
+            [
+              7,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": true,
+                "props": null,
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              10,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ]
+          ],
+          "duration": 10.8,
+          "effectDuration": 0.0,
+          "passiveEffectDuration": 0.0,
+          "priorityLevel": "Normal",
+          "timestamp": 850,
+          "updaters": [
+            { "displayName": "SearchBar", "id": 4, "key": null, "type": 5 }
+          ],
+          "fiberActualDurations": [
+            [3, 4.4],
+            [4, 3.7],
+            [7, 1.3],
+            [10, 0.4]
+          ],
+          "fiberSelfDurations": [
+            [3, 3.1],
+            [4, 2.4],
+            [7, 1.3],
+            [10, 0.4]
+          ]
+        },
+        {
+          "changeDescriptions": [
+            [
+              3,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              8,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ],
+            [
+              9,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ]
+          ],
+          "duration": 16.5,
+          "effectDuration": 0.0,
+          "passiveEffectDuration": 0.0,
+          "priorityLevel": "Low Priority",
+          "timestamp": 900,
+          "updaters": [
+            { "displayName": "SearchBar", "id": 4, "key": null, "type": 5 }
+          ],
+          "fiberActualDurations": [
+            [3, 3.0],
+            [8, 5.5],
+            [9, 2.8]
+          ],
+          "fiberSelfDurations": [
+            [3, 3.0],
+            [8, 5.5],
+            [9, 2.8]
+          ]
+        },
+        {
+          "changeDescriptions": [
+            [
+              8,
+              {
+                "context": false,
+                "didHooksChange": false,
+                "isFirstMount": false,
+                "props": [],
+                "state": null,
+                "hooks": null
+              }
+            ]
+          ],
+          "duration": 13.2,
+          "effectDuration": 0.0,
+          "passiveEffectDuration": 0.0,
+          "priorityLevel": "Low Priority",
+          "timestamp": 1100,
+          "updaters": [
+            { "displayName": "SearchBar", "id": 4, "key": null, "type": 5 }
+          ],
+          "fiberActualDurations": [[8, 4.8]],
+          "fiberSelfDurations": [[8, 4.8]]
+        }
+      ]
+    }
+  ]
+}
