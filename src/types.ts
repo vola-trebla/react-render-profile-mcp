@@ -64,6 +64,9 @@ export interface ComponentMetrics {
   spuriousWastedMs: number;
   contextRenderCount: number;
   contextWastedMs: number;
+  transitionRenderCount: number;
+  transitionSpuriousCount: number;
+  transitionSpuriousWastedMs: number;
   changeReasons: ChangeReason[];
 }
 
@@ -110,6 +113,7 @@ export interface SpuriousRendersResult {
     spurious_count: number;
     wasted_ms: number;
     render_trigger: "UNSTABLE_PARENT_REF" | "CONTEXT_UPDATE";
+    concurrent_yield: boolean;
     recommendation: string;
   }>;
 }
@@ -119,6 +123,7 @@ export interface HottestComponentsResult {
   components: Array<{
     component: string;
     render_count: number;
+    transition_render_count: number;
     total_self_ms: number;
     avg_self_ms: number;
     pct_of_total: number;
@@ -127,6 +132,7 @@ export interface HottestComponentsResult {
 
 export interface RenderCascadeResult {
   commit_index: number;
+  is_concurrent_commit: boolean;
   trigger: string;
   total_commit_ms: number;
   cascade: Array<{
@@ -145,7 +151,10 @@ export interface MemoSuggestionsResult {
     wasted_ms: number;
     avg_render_ms: number;
     prop_stability: "STABLE" | "UNSTABLE_REFERENCES";
-    recommendation: "MEMOIZE" | "DO_NOT_MEMOIZE" | "INVESTIGATE";
+    recommendation:
+      | "MEMOIZE"
+      | "DO_NOT_MEMOIZE"
+      | "INTENTIONAL_CONCURRENT_YIELD";
     reasoning: string;
   }>;
 }
