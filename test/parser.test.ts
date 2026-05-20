@@ -149,12 +149,102 @@ describe("traceRenderCascade", () => {
 });
 
 describe("suggestMemoization", () => {
-  it("suggests React.memo for ProductList", async () => {
+  it("suggests MEMOIZE for ProductList (avg > 2ms)", async () => {
     const data = await loadProfile(FIXTURE);
     const result = suggestMemoization(data);
     expect(result.suggestions).toHaveLength(1);
-    expect(result.suggestions[0].component).toBe("ProductList");
-    expect(result.suggestions[0].suggestion).toBe("React.memo");
+    const s = result.suggestions[0];
+    expect(s.component).toBe("ProductList");
+    expect(s.prop_stability).toBe("UNSTABLE_REFERENCES");
+    // ProductList avg_self_ms ≈ 4.55ms (>2ms) → MEMOIZE
+    expect(s.recommendation).toBe("MEMOIZE");
+    expect(s.avg_render_ms).toBeGreaterThan(2);
+    expect(s.reasoning).toContain("React.memo");
+  });
+
+  it("recommends DO_NOT_MEMOIZE when avg render < 2ms", async () => {
+    // Build a profile where ProductList renders in 0.5ms avg
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/fast-component.profile.json";
+    const fixture = {
+      version: 5,
+      dataForRoots: [
+        {
+          commitData: [
+            {
+              changeDescriptions: [
+                [
+                  4,
+                  {
+                    context: false,
+                    didHooksChange: false,
+                    isFirstMount: false,
+                    props: [],
+                    state: null,
+                    hooks: null,
+                  },
+                ],
+              ],
+              duration: 0.5,
+              effectDuration: 0,
+              fiberActualDurations: [[4, 0.5]],
+              fiberSelfDurations: [[4, 0.5]],
+              passiveEffectDuration: 0,
+              priorityLevel: "Normal",
+              timestamp: 100,
+              updaters: [],
+            },
+            {
+              changeDescriptions: [
+                [
+                  4,
+                  {
+                    context: false,
+                    didHooksChange: false,
+                    isFirstMount: false,
+                    props: [],
+                    state: null,
+                    hooks: null,
+                  },
+                ],
+              ],
+              duration: 0.4,
+              effectDuration: 0,
+              fiberActualDurations: [[4, 0.4]],
+              fiberSelfDurations: [[4, 0.4]],
+              passiveEffectDuration: 0,
+              priorityLevel: "Normal",
+              timestamp: 200,
+              updaters: [],
+            },
+          ],
+          displayName: "App",
+          initialTreeBaseDurations: [[4, 0.5]],
+          operations: [],
+          rootID: 1,
+          snapshots: [
+            [
+              4,
+              {
+                id: 4,
+                children: [],
+                displayName: "TinyButton",
+                key: null,
+                parentID: 3,
+              },
+            ],
+          ],
+        },
+      ],
+    };
+    await writeFile(tmp, JSON.stringify(fixture));
+    const data = await loadProfile(tmp);
+    const result = suggestMemoization(data);
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.suggestions[0].recommendation).toBe("DO_NOT_MEMOIZE");
+    expect(result.suggestions[0].avg_render_ms).toBeLessThan(2);
+    expect(result.suggestions[0].reasoning).toContain("2ms");
+    await unlink(tmp);
   });
 
   it("respects min_wasted_ms threshold", async () => {

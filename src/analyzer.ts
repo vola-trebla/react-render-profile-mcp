@@ -149,14 +149,29 @@ export function suggestMemoization(
       (m) => m.spuriousRenderCount > 0 && m.spuriousWastedMs >= minWastedMs,
     )
     .sort((a, b) => b.spuriousWastedMs - a.spuriousWastedMs)
-    .map((m) => ({
-      component: m.name,
-      render_count: m.renderCount,
-      spurious_count: m.spuriousRenderCount,
-      wasted_ms: round(m.spuriousWastedMs),
-      suggestion: "React.memo" as const,
-      reason: `Re-rendered ${m.spuriousRenderCount}×/${m.renderCount} times with unchanged props. Wrap with React.memo to skip renders when props are shallowly equal.`,
-    }));
+    .map((m) => {
+      const avgRenderMs = round(m.avgSelfMs);
+      // React.memo adds Object.is() comparison on every parent render.
+      // When avg render time < 2ms, that overhead likely exceeds the savings.
+      const recommendation: "MEMOIZE" | "DO_NOT_MEMOIZE" =
+        m.avgSelfMs < 2 ? "DO_NOT_MEMOIZE" : "MEMOIZE";
+
+      const reasoning =
+        recommendation === "DO_NOT_MEMOIZE"
+          ? `avg render time (${avgRenderMs}ms) is below 2ms — React.memo comparison overhead likely exceeds render cost. Fix the unstable reference in the parent instead (stabilize with useMemo/useCallback or move the value outside render).`
+          : `Re-rendered ${m.spuriousRenderCount}×/${m.renderCount} times with unchanged props, wasting ${round(m.spuriousWastedMs)}ms. Wrap with React.memo to skip renders when props are shallowly equal.`;
+
+      return {
+        component: m.name,
+        render_count: m.renderCount,
+        spurious_count: m.spuriousRenderCount,
+        wasted_ms: round(m.spuriousWastedMs),
+        avg_render_ms: avgRenderMs,
+        prop_stability: "UNSTABLE_REFERENCES" as const,
+        recommendation,
+        reasoning,
+      };
+    });
 
   return { suggestions };
 }

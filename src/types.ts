@@ -140,7 +140,9 @@ export interface MemoSuggestionsResult {
     render_count: number;
     spurious_count: number;
     wasted_ms: number;
-    suggestion: "React.memo" | "useMemo" | "useCallback";
-    reason: string;
+    avg_render_ms: number;
+    prop_stability: "STABLE" | "UNSTABLE_REFERENCES";
+    recommendation: "MEMOIZE" | "DO_NOT_MEMOIZE" | "INVESTIGATE";
+    reasoning: string;
   }>;
 }
