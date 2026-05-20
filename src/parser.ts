@@ -10,13 +10,20 @@ import type {
   ProfileData,
 } from "./types.js";
 
-// Decodes the React DevTools operations integer array to extract fiberID → displayName.
+interface OperationsResult {
+  nameMap: Map<number, string>;
+  unmountCounts: Map<number, number>;
+}
+
+// Decodes the React DevTools operations integer array.
 // Operations format (version 5):
 //   [rendererID, rootFiberID, stringTableSize, ...strings, ...opcodes]
 // Opcode 1 (ADD): [1, id, type, parentID, ownerID, nameStringIdx, keyStringIdx]
-function decodeOperations(operations: number[]): Map<number, string> {
+// Opcode 2 (REMOVE): [2, count, id1, id2, ...]
+function decodeOperations(operations: number[]): OperationsResult {
   const nameMap = new Map<number, string>();
-  if (operations.length < 3) return nameMap;
+  const unmountCounts = new Map<number, number>();
+  if (operations.length < 3) return { nameMap, unmountCounts };
 
   let i = 0;
   i += 2; // skip rendererID, rootFiberID
@@ -48,7 +55,10 @@ function decodeOperations(operations: number[]): Map<number, string> {
       case 2: {
         // TREE_OPERATION_REMOVE
         const count = operations[i++];
-        i += count;
+        for (let j = 0; j < count; j++) {
+          const removedId = operations[i++];
+          unmountCounts.set(removedId, (unmountCounts.get(removedId) ?? 0) + 1);
+        }
         break;
       }
       case 3: {
@@ -78,28 +88,38 @@ function decodeOperations(operations: number[]): Map<number, string> {
         break;
       }
       default:
-        return nameMap; // unknown opcode — stop parsing safely
+        return { nameMap, unmountCounts }; // unknown opcode — stop parsing safely
     }
   }
 
-  return nameMap;
+  return { nameMap, unmountCounts };
 }
 
-function buildNameMap(root: ProfileRoot): Map<number, string> {
+interface RootData {
+  nameMap: Map<number, string>;
+  unmountCounts: Map<number, number>;
+}
+
+function buildRootData(root: ProfileRoot): RootData {
   const nameMap = new Map<number, string>();
+  let unmountCounts = new Map<number, number>();
 
   // Primary source: snapshots (most reliable, human-readable)
   for (const [id, snapshot] of root.snapshots) {
     if (snapshot.displayName) nameMap.set(id, snapshot.displayName);
   }
 
-  // Fallback: decode the operations array
-  if (nameMap.size === 0 && root.operations.length > 0) {
+  // Always decode operations — needed for unmount counts even when snapshots cover names
+  if (root.operations.length > 0) {
     try {
-      for (const [id, name] of decodeOperations(root.operations))
-        nameMap.set(id, name);
+      const result = decodeOperations(root.operations);
+      unmountCounts = result.unmountCounts;
+      // Only use name fallback when snapshots didn't cover names
+      if (nameMap.size === 0) {
+        for (const [id, name] of result.nameMap) nameMap.set(id, name);
+      }
     } catch {
-      // silently ignore — name resolution is best-effort
+      // silently ignore — parsing is best-effort
     }
   }
 
@@ -111,7 +131,7 @@ function buildNameMap(root: ProfileRoot): Map<number, string> {
     }
   }
 
-  return nameMap;
+  return { nameMap, unmountCounts };
 }
 
 function classifyReason(
@@ -153,6 +173,7 @@ function isSpurious(fiberID: number, commit: ProfileCommit): boolean {
 function aggregateMetrics(
   commits: ProfileCommit[],
   nameMap: Map<number, string>,
+  unmountCounts: Map<number, number>,
 ): ComponentMetrics[] {
   const map = new Map<number, ComponentMetrics>();
 
@@ -170,6 +191,9 @@ function aggregateMetrics(
           name,
           fiberID,
           renderCount: 0,
+          mountCount: 0,
+          unmountCount: unmountCounts.get(fiberID) ?? 0,
+          updateCount: 0,
           totalActualMs: 0,
           totalSelfMs: 0,
           avgSelfMs: 0,
@@ -183,6 +207,11 @@ function aggregateMetrics(
       m.renderCount++;
       m.totalSelfMs += selfMs;
       m.totalActualMs += actualMs;
+
+      const desc = commit.changeDescriptions?.[String(fiberID)];
+      if (desc?.isFirstMount) m.mountCount++;
+      else m.updateCount++;
+
       m.changeReasons.push(classifyReason(fiberID, ci, commit));
       if (isSpurious(fiberID, commit)) {
         m.spuriousRenderCount++;
@@ -231,13 +260,16 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
   const nameMap = new Map<number, string>();
 
   for (const root of profile.dataForRoots) {
-    const rootNames = buildNameMap(root);
+    const { nameMap: rootNames, unmountCounts } = buildRootData(root);
     for (const [id, name] of rootNames) nameMap.set(id, name);
 
-    for (const m of aggregateMetrics(root.commitData, nameMap)) {
+    for (const m of aggregateMetrics(root.commitData, nameMap, unmountCounts)) {
       const existing = allMetrics.get(m.fiberID);
       if (existing) {
         existing.renderCount += m.renderCount;
+        existing.mountCount += m.mountCount;
+        existing.unmountCount += m.unmountCount;
+        existing.updateCount += m.updateCount;
         existing.totalSelfMs += m.totalSelfMs;
         existing.totalActualMs += m.totalActualMs;
         existing.spuriousRenderCount += m.spuriousRenderCount;
