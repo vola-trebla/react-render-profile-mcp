@@ -62,6 +62,8 @@ export interface ComponentMetrics {
   avgSelfMs: number;
   spuriousRenderCount: number;
   spuriousWastedMs: number;
+  contextRenderCount: number;
+  contextWastedMs: number;
   changeReasons: ChangeReason[];
 }
 
@@ -107,7 +109,8 @@ export interface SpuriousRendersResult {
     render_count: number;
     spurious_count: number;
     wasted_ms: number;
-    reason: string;
+    render_trigger: "UNSTABLE_PARENT_REF" | "CONTEXT_UPDATE";
+    recommendation: string;
   }>;
 }
 
