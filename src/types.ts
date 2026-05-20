@@ -54,6 +54,9 @@ export interface ComponentMetrics {
   name: string;
   fiberID: number;
   renderCount: number;
+  mountCount: number;
+  unmountCount: number;
+  updateCount: number;
   totalActualMs: number;
   totalSelfMs: number;
   avgSelfMs: number;
@@ -88,6 +91,10 @@ export interface RenderSummaryResult {
   top_components: Array<{
     component: string;
     render_count: number;
+    mount_count: number;
+    unmount_count: number;
+    update_count: number;
+    lifecycle_anomaly: boolean;
     total_self_ms: number;
     pct_of_total: number;
   }>;

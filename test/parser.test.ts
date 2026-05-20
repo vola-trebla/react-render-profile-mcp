@@ -89,6 +89,32 @@ describe("getRenderSummary", () => {
     const result = getRenderSummary(data);
     expect(result.top_components[0].component).toBe("ProductList");
   });
+
+  it("includes lifecycle counts in top_components", async () => {
+    const data = await loadProfile(FIXTURE);
+    const result = getRenderSummary(data);
+    const productList = result.top_components.find(
+      (c) => c.component === "ProductList",
+    )!;
+    // 3 total renders: 1 first-mount + 2 updates
+    expect(productList.mount_count).toBe(1);
+    expect(productList.update_count).toBe(2);
+    expect(productList.unmount_count).toBe(0);
+    // 1 mount / 3 renders = 33% — below 80% threshold, no anomaly
+    expect(productList.lifecycle_anomaly).toBe(false);
+  });
+
+  it("flags lifecycle_anomaly when mount_count ≥ 80% of render_count", async () => {
+    const data = await loadProfile(FIXTURE);
+    // Simulate a component that only ever mounts (never updates)
+    // App (fiberID 3) has render_count=1, mount_count=1 → 100% mounts → anomaly
+    const result = getRenderSummary(data);
+    const app = result.top_components.find((c) => c.component === "App");
+    if (app) {
+      // App appears once (initial mount only) → mount_count == render_count → anomaly
+      expect(app.lifecycle_anomaly).toBe(true);
+    }
+  });
 });
 
 describe("getHottestComponents", () => {

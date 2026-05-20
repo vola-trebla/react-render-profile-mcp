@@ -30,6 +30,13 @@ export function getRenderSummary(data: ProfileData): RenderSummaryResult {
     top_components: top5.map((m) => ({
       component: m.name,
       render_count: m.renderCount,
+      mount_count: m.mountCount,
+      unmount_count: m.unmountCount,
+      update_count: m.updateCount,
+      // mount_count ≥ 80% of render_count signals key instability: component keeps
+      // being destroyed and recreated instead of updating — never updating its DOM
+      lifecycle_anomaly:
+        m.renderCount > 0 && m.mountCount / m.renderCount >= 0.8,
       total_self_ms: round(m.totalSelfMs),
       pct_of_total: round((m.totalSelfMs / data.totalMs) * 100),
     })),
