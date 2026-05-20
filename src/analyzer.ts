@@ -51,15 +51,22 @@ export function findSpuriousRenders(
 
   const propEntries: Entry[] = data.metrics
     .filter((m) => m.spuriousRenderCount > 0 && m.renderCount >= minRenderCount)
-    .map((m) => ({
-      component: m.name,
-      render_count: m.renderCount,
-      spurious_count: m.spuriousRenderCount,
-      wasted_ms: round(m.spuriousWastedMs),
-      render_trigger: "UNSTABLE_PARENT_REF" as const,
-      recommendation:
-        "Wrap with React.memo — re-renders are driven by unstable object/function/array references from the parent. React.memo will skip them when props are shallowly equal.",
-    }));
+    .map((m) => {
+      const concurrentYield =
+        m.transitionSpuriousCount === m.spuriousRenderCount &&
+        m.spuriousRenderCount > 0;
+      return {
+        component: m.name,
+        render_count: m.renderCount,
+        spurious_count: m.spuriousRenderCount,
+        wasted_ms: round(m.spuriousWastedMs),
+        render_trigger: "UNSTABLE_PARENT_REF" as const,
+        concurrent_yield: concurrentYield,
+        recommendation: concurrentYield
+          ? "INTENTIONAL_CONCURRENT_YIELD — all spurious renders happened during startTransition/useDeferredValue commits. This is expected React 18 behavior; do not add React.memo."
+          : "Wrap with React.memo — re-renders are driven by unstable object/function/array references from the parent. React.memo will skip them when props are shallowly equal.",
+      };
+    });
 
   // Context updates bypass React.memo entirely — surface them separately so the
   // agent recommends the correct fix (stabilize the context value, not memo the consumer).
@@ -76,6 +83,7 @@ export function findSpuriousRenders(
       spurious_count: m.contextRenderCount,
       wasted_ms: round(m.contextWastedMs),
       render_trigger: "CONTEXT_UPDATE" as const,
+      concurrent_yield: false,
       recommendation:
         "React.memo cannot help here — context updates bypass memo. Stabilize the context value with useMemo, or split the context so consumers only subscribe to the slice they use.",
     }));
@@ -100,6 +108,7 @@ export function getHottestComponents(
     components: sorted.map((m) => ({
       component: m.name,
       render_count: m.renderCount,
+      transition_render_count: m.transitionRenderCount,
       total_self_ms: round(m.totalSelfMs),
       avg_self_ms: round(m.avgSelfMs),
       pct_of_total: round((m.totalSelfMs / data.totalMs) * 100),
@@ -157,6 +166,9 @@ export function traceRenderCascade(
 
   return {
     commit_index: commitIndex,
+    is_concurrent_commit:
+      commit.priorityLevel === "Low Priority" ||
+      commit.priorityLevel === "Idle",
     trigger,
     total_commit_ms: round(commit.duration),
     cascade,
@@ -174,6 +186,22 @@ export function suggestMemoization(
     .sort((a, b) => b.spuriousWastedMs - a.spuriousWastedMs)
     .map((m) => {
       const avgRenderMs = round(m.avgSelfMs);
+
+      // All spurious renders happened during transition commits — intentional React 18 behavior.
+      if (m.transitionSpuriousCount === m.spuriousRenderCount) {
+        return {
+          component: m.name,
+          render_count: m.renderCount,
+          spurious_count: m.spuriousRenderCount,
+          wasted_ms: round(m.spuriousWastedMs),
+          avg_render_ms: avgRenderMs,
+          prop_stability: "UNSTABLE_REFERENCES" as const,
+          recommendation: "INTENTIONAL_CONCURRENT_YIELD" as const,
+          reasoning:
+            "All spurious renders occurred during startTransition/useDeferredValue commits. React 18 intentionally renders these components multiple times while resolving deferred work — do not add React.memo.",
+        };
+      }
+
       // React.memo adds Object.is() comparison on every parent render.
       // When avg render time < 2ms, that overhead likely exceeds the savings.
       const recommendation: "MEMOIZE" | "DO_NOT_MEMOIZE" =

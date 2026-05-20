@@ -170,6 +170,15 @@ function isSpurious(fiberID: number, commit: ProfileCommit): boolean {
   return desc.props !== null && desc.props.length === 0;
 }
 
+// React 18 startTransition/useDeferredValue renders use Low Priority or Idle lanes.
+// These are intentional — React may render a component multiple times, discard incomplete
+// trees, and restart. Flagging them as regressions would be a false positive.
+function isTransitionCommit(commit: ProfileCommit): boolean {
+  return (
+    commit.priorityLevel === "Low Priority" || commit.priorityLevel === "Idle"
+  );
+}
+
 function aggregateMetrics(
   commits: ProfileCommit[],
   nameMap: Map<number, string>,
@@ -201,6 +210,9 @@ function aggregateMetrics(
           spuriousWastedMs: 0,
           contextRenderCount: 0,
           contextWastedMs: 0,
+          transitionRenderCount: 0,
+          transitionSpuriousCount: 0,
+          transitionSpuriousWastedMs: 0,
           changeReasons: [],
         });
       }
@@ -214,10 +226,17 @@ function aggregateMetrics(
       if (desc?.isFirstMount) m.mountCount++;
       else m.updateCount++;
 
+      const transition = isTransitionCommit(commit);
+      if (transition) m.transitionRenderCount++;
+
       m.changeReasons.push(classifyReason(fiberID, ci, commit));
       if (isSpurious(fiberID, commit)) {
         m.spuriousRenderCount++;
         m.spuriousWastedMs += selfMs;
+        if (transition) {
+          m.transitionSpuriousCount++;
+          m.transitionSpuriousWastedMs += selfMs;
+        }
       }
       if (desc?.context) {
         m.contextRenderCount++;
@@ -282,6 +301,9 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
         existing.spuriousWastedMs += m.spuriousWastedMs;
         existing.contextRenderCount += m.contextRenderCount;
         existing.contextWastedMs += m.contextWastedMs;
+        existing.transitionRenderCount += m.transitionRenderCount;
+        existing.transitionSpuriousCount += m.transitionSpuriousCount;
+        existing.transitionSpuriousWastedMs += m.transitionSpuriousWastedMs;
         existing.changeReasons.push(...m.changeReasons);
         existing.avgSelfMs = existing.totalSelfMs / existing.renderCount;
       } else {

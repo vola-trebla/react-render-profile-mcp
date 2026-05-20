@@ -132,6 +132,77 @@ describe("findSpuriousRenders", () => {
     await unlink(tmp);
   });
 
+  it("marks concurrent_yield:false for normal-priority spurious renders", async () => {
+    const data = await loadProfile(FIXTURE);
+    const result = findSpuriousRenders(data);
+    const entry = result.spurious_renders.find(
+      (r) => r.component === "ProductList",
+    )!;
+    expect(entry.concurrent_yield).toBe(false);
+  });
+
+  it("flags concurrent_yield:true for spurious renders in transition commits", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/transition-spurious.profile.json";
+    const fixture = {
+      version: 5,
+      dataForRoots: [
+        {
+          commitData: [
+            {
+              changeDescriptions: [
+                [
+                  7,
+                  {
+                    context: false,
+                    didHooksChange: false,
+                    isFirstMount: false,
+                    props: [],
+                    state: null,
+                    hooks: null,
+                  },
+                ],
+              ],
+              duration: 4.0,
+              effectDuration: 0,
+              fiberActualDurations: [[7, 4.0]],
+              fiberSelfDurations: [[7, 4.0]],
+              passiveEffectDuration: 0,
+              priorityLevel: "Low Priority",
+              timestamp: 100,
+              updaters: [],
+            },
+          ],
+          displayName: "App",
+          initialTreeBaseDurations: [[7, 4.0]],
+          operations: [],
+          rootID: 1,
+          snapshots: [
+            [
+              7,
+              {
+                id: 7,
+                children: [],
+                displayName: "DeferredList",
+                key: null,
+                parentID: 3,
+              },
+            ],
+          ],
+        },
+      ],
+    };
+    await writeFile(tmp, JSON.stringify(fixture));
+    const data = await loadProfile(tmp);
+    const result = findSpuriousRenders(data);
+    expect(result.spurious_renders).toHaveLength(1);
+    expect(result.spurious_renders[0].concurrent_yield).toBe(true);
+    expect(result.spurious_renders[0].recommendation).toContain(
+      "INTENTIONAL_CONCURRENT_YIELD",
+    );
+    await unlink(tmp);
+  });
+
   it("respects min_render_count filter", async () => {
     const data = await loadProfile(FIXTURE);
     const result = findSpuriousRenders(data, 5);
@@ -210,6 +281,12 @@ describe("traceRenderCascade", () => {
   it("throws on out-of-range commit_index", async () => {
     const data = await loadProfile(FIXTURE);
     expect(() => traceRenderCascade(data, 99)).toThrow("out of range");
+  });
+
+  it("reports is_concurrent_commit:false for Normal priority commits", async () => {
+    const data = await loadProfile(FIXTURE);
+    const result = traceRenderCascade(data, 1);
+    expect(result.is_concurrent_commit).toBe(false);
   });
 });
 
@@ -316,5 +393,74 @@ describe("suggestMemoization", () => {
     const data = await loadProfile(FIXTURE);
     const result = suggestMemoization(data, 999);
     expect(result.suggestions).toHaveLength(0);
+  });
+
+  it("returns INTENTIONAL_CONCURRENT_YIELD for transition-only spurious renders", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/transition-memo.profile.json";
+    const fixture = {
+      version: 5,
+      dataForRoots: [
+        {
+          commitData: [
+            {
+              changeDescriptions: [
+                [
+                  8,
+                  {
+                    context: false,
+                    didHooksChange: false,
+                    isFirstMount: false,
+                    props: [],
+                    state: null,
+                    hooks: null,
+                  },
+                ],
+              ],
+              duration: 5.0,
+              effectDuration: 0,
+              fiberActualDurations: [[8, 5.0]],
+              fiberSelfDurations: [[8, 5.0]],
+              passiveEffectDuration: 0,
+              priorityLevel: "Low Priority",
+              timestamp: 100,
+              updaters: [],
+            },
+          ],
+          displayName: "App",
+          initialTreeBaseDurations: [[8, 5.0]],
+          operations: [],
+          rootID: 1,
+          snapshots: [
+            [
+              8,
+              {
+                id: 8,
+                children: [],
+                displayName: "SearchResults",
+                key: null,
+                parentID: 3,
+              },
+            ],
+          ],
+        },
+      ],
+    };
+    await writeFile(tmp, JSON.stringify(fixture));
+    const data = await loadProfile(tmp);
+    const result = suggestMemoization(data);
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.suggestions[0].recommendation).toBe(
+      "INTENTIONAL_CONCURRENT_YIELD",
+    );
+    expect(result.suggestions[0].reasoning).toContain("startTransition");
+    await unlink(tmp);
+  });
+
+  it("includes transition_render_count in get_hottest_components", async () => {
+    const data = await loadProfile(FIXTURE);
+    const result = getHottestComponents(data);
+    // fixture uses Normal priority — transition_render_count should be 0 for all
+    expect(result.components[0].transition_render_count).toBe(0);
   });
 });
