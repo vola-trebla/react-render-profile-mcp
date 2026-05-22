@@ -1,8 +1,17 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
+import fs from "fs/promises";
 import { loadProfile } from "./parser.js";
+import { ASTPerformanceRemediator } from "./remediator.js";
+import { CompilerEfficacyAuditor } from "./compilerAuditor.js";
+import { RSCStreamingProfiler } from "./rscProfiler.js";
+import { MultiLayerTimelineCorrelator } from "./correlator.js";
+import { DynamicSVGGenerator } from "./visualizer.js";
 import {
   getRenderSummary,
   findSpuriousRenders,
@@ -19,7 +28,7 @@ import {
 
 const server = new McpServer({
   name: "react-render-profile-mcp",
-  version: "0.3.1",
+  version: "1.0.0",
 });
 
 function errorResponse(err: unknown) {
@@ -34,314 +43,352 @@ function errorResponse(err: unknown) {
   };
 }
 
-server.registerTool(
+function registerProfileTool(
+  name: string,
+  description: string,
+  inputSchema: any,
+  handler: (data: any, args: any) => any,
+) {
+  server.registerTool(
+    name,
+    {
+      description,
+      inputSchema,
+    },
+    async (args: any): Promise<any> => {
+      try {
+        const data = await loadProfile(args.profile_path);
+        const result = await handler(data, args);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                typeof result === "string"
+                  ? result
+                  : JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (err) {
+        return errorResponse(err);
+      }
+    },
+  );
+}
+
+registerProfileTool(
   "get_render_summary",
+  "Returns a high-level overview of a React DevTools Profiler export: total commits, total render time, " +
+    "top 5 slowest components by self time, and total spurious (wasted) render count. " +
+    "Use this first to understand the scale of the performance problem before drilling into specifics.",
   {
-    description:
-      "Returns a high-level overview of a React DevTools Profiler export: total commits, total render time, " +
-      "top 5 slowest components by self time, and total spurious (wasted) render count. " +
-      "Use this first to understand the scale of the performance problem before drilling into specifics.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
   },
-  async ({ profile_path }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(getRenderSummary(data), null, 2),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data) => getRenderSummary(data),
 );
 
-server.registerTool(
+registerProfileTool(
   "find_spurious_renders",
+  "Finds React components that re-rendered without any meaningful prop, state, context, or hook changes. " +
+    "These are wasted renders caused by unstable references (inline objects/functions/arrays) passed from a parent. " +
+    "Returns component name, total render count, spurious count, and wasted milliseconds. " +
+    "Use to identify the highest-ROI targets for React.memo.",
   {
-    description:
-      "Finds React components that re-rendered without any meaningful prop, state, context, or hook changes. " +
-      "These are wasted renders caused by unstable references (inline objects/functions/arrays) passed from a parent. " +
-      "Returns component name, total render count, spurious count, and wasted milliseconds. " +
-      "Use to identify the highest-ROI targets for React.memo.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      min_render_count: z
-        .number()
-        .optional()
-        .describe(
-          "Only include components with at least this many total renders (default: 1)",
-        ),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    min_render_count: z
+      .number()
+      .optional()
+      .describe(
+        "Only include components with at least this many total renders (default: 1)",
+      ),
   },
-  async ({ profile_path, min_render_count }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              findSpuriousRenders(data, min_render_count),
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data, { min_render_count }) => findSpuriousRenders(data, min_render_count),
 );
 
-server.registerTool(
+registerProfileTool(
   "get_hottest_components",
+  "Returns the top N React components ranked by self CPU time (excluding children) across the entire profiling session. " +
+    "Includes total self ms, average per render, and percentage of total profile time. " +
+    "Use to find which components are the most expensive to render, regardless of cause.",
   {
-    description:
-      "Returns the top N React components ranked by self CPU time (excluding children) across the entire profiling session. " +
-      "Includes total self ms, average per render, and percentage of total profile time. " +
-      "Use to find which components are the most expensive to render, regardless of cause.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      top_n: z
-        .number()
-        .optional()
-        .describe("Number of components to return (default: 10)"),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    top_n: z
+      .number()
+      .optional()
+      .describe("Number of components to return (default: 10)"),
   },
-  async ({ profile_path, top_n }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(getHottestComponents(data, top_n), null, 2),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data, { top_n }) => getHottestComponents(data, top_n),
 );
 
-server.registerTool(
+registerProfileTool(
   "trace_render_cascade",
+  "For a specific React commit (render cycle), shows what triggered it and lists every component " +
+    "that re-rendered as a result, sorted by actual duration descending. " +
+    "Reveals propagation — e.g. a context update cascading into 40 children. " +
+    "Call get_render_summary first to find total_commits, then use 0-based commit_index.",
   {
-    description:
-      "For a specific React commit (render cycle), shows what triggered it and lists every component " +
-      "that re-rendered as a result, sorted by actual duration descending. " +
-      "Reveals propagation — e.g. a context update cascading into 40 children. " +
-      "Call get_render_summary first to find total_commits, then use 0-based commit_index.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      commit_index: z
-        .number()
-        .describe("Zero-based index of the commit to inspect"),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    commit_index: z
+      .number()
+      .describe("Zero-based index of the commit to inspect"),
   },
-  async ({ profile_path, commit_index }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              traceRenderCascade(data, commit_index),
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data, { commit_index }) => traceRenderCascade(data, commit_index),
 );
 
-server.registerTool(
+registerProfileTool(
   "suggest_memoization",
+  "Analyzes the profiling data and returns concrete memoization suggestions. " +
+    "Currently detects React.memo candidates: components with spurious renders above the wasted ms threshold. " +
+    "Each suggestion explains why the component re-renders unnecessarily and what to do about it.",
   {
-    description:
-      "Analyzes the profiling data and returns concrete memoization suggestions. " +
-      "Currently detects React.memo candidates: components with spurious renders above the wasted ms threshold. " +
-      "Each suggestion explains why the component re-renders unnecessarily and what to do about it.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      min_wasted_ms: z
-        .number()
-        .optional()
-        .describe(
-          "Only suggest for components wasting more than this many ms total (default: 0)",
-        ),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    min_wasted_ms: z
+      .number()
+      .optional()
+      .describe(
+        "Only suggest for components wasting more than this many ms total (default: 0)",
+      ),
   },
-  async ({ profile_path, min_wasted_ms }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              suggestMemoization(data, min_wasted_ms),
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data, { min_wasted_ms }) => suggestMemoization(data, min_wasted_ms),
 );
 
-server.registerTool(
+registerProfileTool(
   "analyze_compiler_efficacy",
+  "Evaluates React Compiler or manual React.memo efficacy by tracking spurious renders. " +
+    "Calculates the Invalidation Index for each component to identify where unstable " +
+    "prop references trigger wasteful renders.",
   {
-    description:
-      "Evaluates React Compiler or manual React.memo efficacy by tracking spurious renders. " +
-      "Calculates the Invalidation Index for each component to identify where unstable " +
-      "prop references trigger wasteful renders.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      invalid_threshold: z
-        .number()
-        .optional()
-        .describe(
-          "Minimum invalidation index threshold to report (default: 10)",
-        ),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    invalid_threshold: z
+      .number()
+      .optional()
+      .describe("Minimum invalidation index threshold to report (default: 10)"),
   },
-  async ({ profile_path, invalid_threshold }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              analyzeCompilerEfficacy(data, invalid_threshold),
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data, { invalid_threshold }) =>
+    analyzeCompilerEfficacy(data, invalid_threshold),
 );
 
-server.registerTool(
+registerProfileTool(
   "diagnose_hydration_and_suspense",
+  "Detects server-client hydration mismatches and sequential nested Suspense waterfalls " +
+    "by analyzing mount durations, unmount events, and timelines.",
   {
-    description:
-      "Detects server-client hydration mismatches and sequential nested Suspense waterfalls " +
-      "by analyzing mount durations, unmount events, and timelines.",
-    inputSchema: {
-      profile_path: z
-        .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      waterfall_threshold_ms: z
-        .number()
-        .optional()
-        .describe(
-          "Timeline delta threshold in ms to detect Suspense waterfalls (default: 100)",
-        ),
-    },
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    waterfall_threshold_ms: z
+      .number()
+      .optional()
+      .describe(
+        "Timeline delta threshold in ms to detect Suspense waterfalls (default: 100)",
+      ),
   },
-  async ({ profile_path, waterfall_threshold_ms }) => {
-    try {
-      const data = await loadProfile(profile_path);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              diagnoseHydrationAndSuspense(data, waterfall_threshold_ms),
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return errorResponse(err);
-    }
-  },
+  (data, { waterfall_threshold_ms }) =>
+    diagnoseHydrationAndSuspense(data, waterfall_threshold_ms),
 );
 
-server.registerTool(
+registerProfileTool(
   "evaluate_external_store_performance",
+  "Analyzes useSyncExternalStore performance, identifying selector reference instability " +
+    "and concurrency bypasses where heavy store updates block the high-priority main thread.",
+  {
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    max_blocking_task_ms: z
+      .number()
+      .optional()
+      .describe(
+        "Maximum duration budget in ms for synchronous tasks before flagging bypass (default: 50)",
+      ),
+  },
+  (data, { max_blocking_task_ms }) =>
+    evaluateExternalStorePerformance(data, max_blocking_task_ms),
+);
+
+registerProfileTool(
+  "trace_state_cascade_footprint",
+  "Reconstructs the virtual parent/owner tree traversal to measure the depth and consumer " +
+    "count of a state update cascade for a specific commit index.",
+  {
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    commit_index: z
+      .number()
+      .describe("Zero-based index of the commit to trace"),
+  },
+  (data, { commit_index }) => traceStateCascadeFootprint(data, commit_index),
+);
+
+server.registerResource(
+  "react-profile-cascade",
+  new ResourceTemplate("react-profile://commits/{commitId}/cascade", {
+    list: undefined,
+  }),
+  {
+    mimeType: "image/svg+xml",
+    description:
+      "Interactive SVG flowchart displaying rendering cascades for a React commit",
+  },
+  async (uri, variables) => {
+    try {
+      const commitId = variables.commitId;
+      if (typeof commitId !== "string" && typeof commitId !== "number") {
+        throw new Error("Missing or invalid commitId variable");
+      }
+      const commitIndex = parseInt(String(commitId), 10);
+      const profilePath = uri.searchParams.get("profile_path");
+      if (!profilePath) {
+        throw new Error("Missing profile_path query parameter");
+      }
+      const data = await loadProfile(profilePath);
+      // Construct CascadeNode tree
+      const commit = data.commits[commitIndex];
+      if (!commit) {
+        throw new Error(`Commit index ${commitIndex} not found in profile`);
+      }
+      const renderedFiberIds = new Set(
+        commit.fiberActualDurations.map(([id]) => id),
+      );
+      if (renderedFiberIds.size === 0) {
+        throw new Error(
+          `No components rendered in commit index ${commitIndex}`,
+        );
+      }
+
+      const buildNode = (fiberId: number, depth: number): any => {
+        const name = data.nameMap.get(fiberId) ?? `[Component #${fiberId}]`;
+        const renderDuration =
+          commit.fiberActualDurations.find(([id]) => id === fiberId)?.[1] ?? 0;
+
+        const desc = commit.changeDescriptions?.[String(fiberId)];
+        let triggerSource:
+          | "CONTEXT"
+          | "STORE_SUBSCRIPTION"
+          | "PROPS_INVALIDATION"
+          | "STATE_CHANGE" = "PROPS_INVALIDATION";
+        if (desc) {
+          if (desc.context) {
+            triggerSource = "CONTEXT";
+          } else if (desc.state && desc.state.length > 0) {
+            triggerSource = "STATE_CHANGE";
+          } else if (desc.didHooksChange) {
+            triggerSource = "STORE_SUBSCRIPTION";
+          }
+        }
+
+        const childrenIds = data.childrenMap.get(fiberId) ?? [];
+        const renderedChildren = childrenIds.filter((id) =>
+          renderedFiberIds.has(id),
+        );
+        const childrenNodes = renderedChildren.map((childId) =>
+          buildNode(childId, depth + 1),
+        );
+
+        return {
+          id: String(fiberId),
+          name,
+          renderDuration,
+          triggerSource,
+          depth,
+          children: childrenNodes,
+        };
+      };
+
+      const roots = Array.from(renderedFiberIds).filter((id) => {
+        const parentId = data.parentMap.get(id);
+        return !parentId || !renderedFiberIds.has(parentId);
+      });
+
+      if (roots.length === 0) {
+        throw new Error("Could not determine cascade root component");
+      }
+
+      let rootNode;
+      if (roots.length === 1) {
+        rootNode = buildNode(roots[0], 0);
+      } else {
+        const children = roots.map((rootId) => buildNode(rootId, 1));
+        rootNode = {
+          id: "virtual-root",
+          name: "Render Cascade Root",
+          renderDuration: commit.duration,
+          triggerSource: "STATE_CHANGE" as const,
+          depth: 0,
+          children,
+        };
+      }
+
+      const svg = DynamicSVGGenerator.generateRenderCascade(rootNode);
+      return {
+        contents: [
+          {
+            uri: uri.toString(),
+            mimeType: "image/svg+xml",
+            text: svg,
+          },
+        ],
+      };
+    } catch (err) {
+      throw err;
+    }
+  },
+);
+
+server.registerTool(
+  "remediate_component",
   {
     description:
-      "Analyzes useSyncExternalStore performance, identifying selector reference instability " +
-      "and concurrency bypasses where heavy store updates block the high-priority main thread.",
+      "Automatically optimizes a React component's AST by hoisting static declarations, " +
+      "wrapping unstable callbacks/objects in useCallback/useMemo, and wrapping the component " +
+      "in React.memo if the ROI score is above 1.5. Mutates the file on disk.",
     inputSchema: {
-      profile_path: z
+      file_path: z
+        .string()
+        .describe("Absolute path to the React component file on disk"),
+      component_name: z
+        .string()
+        .describe("Name of the React component to optimize"),
+      unstable_props: z
         .string()
         .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
+          "Comma-separated or space-separated list of props to memoize/wrap in hooks",
         ),
-      max_blocking_task_ms: z
+      roi_score: z
         .number()
-        .optional()
         .describe(
-          "Maximum duration budget in ms for synchronous tasks before flagging bypass (default: 50)",
+          "Estimated ROI score from profiling (usually 0 to 5) justifying memoization overhead",
         ),
     },
   },
-  async ({ profile_path, max_blocking_task_ms }) => {
+  async ({ file_path, component_name, unstable_props, roi_score }) => {
     try {
-      const data = await loadProfile(profile_path);
+      const remediator = new ASTPerformanceRemediator();
+      const updatedCode = remediator.optimizeComponent({
+        filePath: file_path,
+        componentName: component_name,
+        unstableProps: unstable_props,
+        roiScore: roi_score,
+      });
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(
-              evaluateExternalStorePerformance(data, max_blocking_task_ms),
-              null,
-              2,
-            ),
+            text: `Successfully optimized component ${component_name} in ${file_path}.\n\nUpdated AST Output:\n\n${updatedCode}`,
           },
         ],
       };
@@ -352,40 +399,107 @@ server.registerTool(
 );
 
 server.registerTool(
-  "trace_state_cascade_footprint",
+  "audit_compiler_rules",
   {
     description:
-      "Reconstructs the virtual parent/owner tree traversal to measure the depth and consumer " +
-      "count of a state update cascade for a specific commit index.",
+      "Audits a React component file to check if it violates compiler memoization safety guidelines " +
+      "(e.g., Date.now(), Math.random(), useRef mutations in render, 'use no memo' bails).",
     inputSchema: {
-      profile_path: z
+      file_path: z
         .string()
-        .describe(
-          "Absolute path to the React DevTools Profiler export (.json)",
-        ),
-      commit_index: z
-        .number()
-        .describe("Zero-based index of the commit to trace"),
+        .describe("Absolute path to the React component file on disk"),
+      component_name: z
+        .string()
+        .describe("Name of the React component to audit"),
     },
   },
-  async ({ profile_path, commit_index }) => {
+  async ({ file_path, component_name }) => {
     try {
-      const data = await loadProfile(profile_path);
+      const auditor = new CompilerEfficacyAuditor();
+      const result = auditor.auditComponentInFile(file_path, component_name);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(
-              traceStateCascadeFootprint(data, commit_index),
-              null,
-              2,
-            ),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
     } catch (err) {
       return errorResponse(err);
     }
+  },
+);
+
+server.registerTool(
+  "profile_rsc_stream",
+  {
+    description:
+      "Analyzes a React Server Components (RSC) Flight stream text log. " +
+      "Detects bloated chunks (>50KB), sequential Waterfall request bottlenecks, " +
+      "and security hazards like constructor traversing exploits (CVE-2025-55182 / React2Shell).",
+    inputSchema: {
+      stream_payload: z
+        .string()
+        .describe("Raw line-separated Flight stream text payload"),
+    },
+  },
+  async ({ stream_payload }) => {
+    try {
+      const chunks = RSCStreamingProfiler.parseRawFlightStream(stream_payload);
+      const result = RSCStreamingProfiler.profileRSCStream(chunks);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+registerProfileTool(
+  "correlate_chrome_trace",
+  "Aligns React commits with Chrome Performance trace events (re-layout, paint, style calculations) " +
+    "using blink.user_timing ⚛ markers to calculate Core Web Vitals (INP/CLS) impact.",
+  {
+    profile_path: z
+      .string()
+      .describe("Absolute path to the React DevTools Profiler export (.json)"),
+    trace_path: z
+      .string()
+      .describe(
+        "Absolute path to Chrome performance timeline trace export (.json)",
+      ),
+  },
+  async (data, { trace_path }) => {
+    const rawTrace = await fs.readFile(trace_path, "utf-8");
+
+    let traceEvents: any;
+    try {
+      const parsed = JSON.parse(rawTrace);
+      traceEvents = Array.isArray(parsed) ? parsed : parsed.traceEvents;
+    } catch {
+      throw new Error(`Failed to parse Chrome Trace JSON from: ${trace_path}`);
+    }
+
+    if (!traceEvents || !Array.isArray(traceEvents)) {
+      throw new Error(
+        `Invalid Chrome Trace file format at: ${trace_path}. Expected traceEvents array.`,
+      );
+    }
+
+    const commits = data.commits.map((c: any, idx: number) => ({
+      commitIndex: idx,
+      commitTime: c.timestamp,
+      duration: c.duration,
+    }));
+
+    return MultiLayerTimelineCorrelator.correlateTimeline(commits, traceEvents);
   },
 );
 
