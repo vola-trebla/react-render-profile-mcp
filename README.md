@@ -5,9 +5,9 @@
 [![CI](https://github.com/vola-trebla/react-render-profile-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/vola-trebla/react-render-profile-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An MCP server that decodes React DevTools Profiler exports into **actionable render summaries** for AI agents.
+An MCP server that decodes React DevTools Profiler exports into **actionable performance diagnostics and render summaries** for AI agents.
 
-Your agent just refactored a context provider. Now 80 components re-render on every keystroke. It has no idea.
+Your agent just refactored a context provider or updated state logic. Now 80 components re-render on every keystroke. It has no idea. This server bridges that visual and runtime perception gap.
 
 ---
 
@@ -36,23 +36,25 @@ The agent can't parse this. Even if it could, it can't run the aggregation to id
 
 ---
 
-## ✅ The Fix
+## ✅ The Solution
 
 This MCP server loads the profiler export and gives agents exactly what they need:
 
-- Which components re-rendered the most — and how much CPU time they consumed
-- Which re-renders were **spurious** (props reference changed, no actual keys differed) vs **context-driven** (React.memo can't help)
-- Whether a component is being **destroyed and recreated** instead of updated (unstable `key` prop)
-- What triggered a specific render cascade — and whether it was a React 18 **transition commit**
-- Which components are `React.memo` candidates — and which are too fast for memo to help
+- **Render Summaries & Lifecycle Anomaly Detection**: Spotting components being destroyed/recreated (unstable `key` prop) instead of updated.
+- **Spurious Renders Classification**: Labeling triggers (`UNSTABLE_PARENT_REF`, `CONTEXT_UPDATE`, `INTENTIONAL_CONCURRENT_YIELD`).
+- **Next-Gen SRE Diagnostic Tools**: Checking React Compiler efficacy, client-side hydration mismatches, Suspense waterfalls, Zustand/Redux selector loops, and update cascade propagation depths.
 
 ---
 
-## 🛠️ Tools
+## 🛠️ MCP Tools
 
-### `get_render_summary`
+All tools take a required `profile_path` (absolute path to the exported `.json` profile).
 
-High-level overview: total commits, total render time, top 5 slowest components, total spurious render count. Each component includes lifecycle counts so the agent can spot key-instability patterns.
+---
+
+### 1. `get_render_summary`
+
+Provides a high-level overview: total commits, total render time, top 5 slowest components, and total spurious render count. Each component includes lifecycle counts so the agent can spot key-instability patterns.
 
 ```json
 {
@@ -84,13 +86,13 @@ High-level overview: total commits, total render time, top 5 slowest components,
 }
 ```
 
-`lifecycle_anomaly: true` means the component is being destroyed and recreated on every render instead of updating — the classic unstable `key` prop bug. React rebuilds the entire DOM subtree each time.
+- `lifecycle_anomaly: true` indicates that a component is unmounted and mounted again on every commit instead of updating (a sign of unstable or index-based `key` props).
 
-**Use first** to understand the scale of the problem.
+---
 
-### `find_spurious_renders`
+### 2. `find_spurious_renders`
 
-Components that re-rendered unnecessarily, with the root cause classified so the agent knows the correct fix.
+Identifies components that re-rendered unnecessarily, with the root cause classified so the agent knows the correct fix.
 
 ```json
 {
@@ -112,78 +114,128 @@ Components that re-rendered unnecessarily, with the root cause classified so the
       "render_trigger": "CONTEXT_UPDATE",
       "concurrent_yield": false,
       "recommendation": "React.memo cannot help here — context updates bypass memo. Stabilize the context value with useMemo, or split the context."
-    },
-    {
-      "component": "DeferredList",
-      "render_count": 8,
-      "spurious_count": 6,
-      "wasted_ms": 24.1,
-      "render_trigger": "UNSTABLE_PARENT_REF",
-      "concurrent_yield": true,
-      "recommendation": "INTENTIONAL_CONCURRENT_YIELD — all spurious renders happened during startTransition/useDeferredValue commits. This is expected React 18 behavior; do not add React.memo."
     }
   ]
 }
 ```
 
-- `UNSTABLE_PARENT_REF` — fix with `React.memo`
-- `CONTEXT_UPDATE` — fix by stabilizing the context value; `React.memo` does nothing here
-- `concurrent_yield: true` — React 18 intentionally renders these multiple times during transitions; do not optimize
+---
 
-### `get_hottest_components`
+### 3. `analyze_compiler_efficacy`
 
-Top N components by self CPU time (excluding children). Includes `transition_render_count` so the agent can see what fraction of renders are React 18 deferred work.
+Computes the **Invalidation Index** ($I = \frac{S_{spurious}}{S_{total}} \times T_{spurious\_ms}$) to highlight where manual `React.memo` or React Compiler (React 19) fails due to inline object allocations or unstable parent references.
+
+- **Optional Parameter**: `invalid_threshold` (number, default: `10`).
 
 ```json
 {
-  "total_profile_ms": 312.4,
-  "components": [
+  "verdicts": [
     {
-      "component": "ProductList",
-      "render_count": 24,
-      "transition_render_count": 3,
-      "total_self_ms": 89.2,
-      "avg_self_ms": 3.72,
-      "pct_of_total": 28.55
+      "severity": "CRITICAL",
+      "component_name": "ProductList",
+      "target_file_path": "src/components/ProductList.tsx",
+      "ineffective_render_count": 23,
+      "wasted_ms": 84.3,
+      "trigger_cause": "UNSTABLE_PARENT_PROP_REFERENCE",
+      "recommendation": "🐸 Ineffective rendering detected! Component <ProductList> has a high invalidation index (80.79) due to spurious renders. Memoize parent component props using useMemo/useCallback or hoist static objects out of the parent's render function to stabilize references."
     }
   ]
 }
 ```
 
-### `trace_render_cascade`
+---
 
-For a specific commit, shows what triggered it and every component that re-rendered as a result, sorted by duration. Now includes `is_concurrent_commit` so the agent knows whether this is a React 18 transition render.
+### 4. `diagnose_hydration_and_suspense`
+
+Catches client-side hydration mismatches (where React discards server-rendered HTML and mounts the tree from scratch) and monitors spacing between consecutive Suspense resolves to flag sequential nested mount fetch waterfalls.
+
+- **Optional Parameter**: `waterfall_threshold_ms` (number, default: `100`).
 
 ```json
 {
-  "commit_index": 7,
-  "is_concurrent_commit": true,
-  "trigger": "SearchInput",
-  "total_commit_ms": 28.4,
-  "cascade": [
+  "verdicts": [
     {
-      "component": "ProductList",
-      "self_ms": 18.2,
-      "actual_ms": 18.2,
-      "reason": "parent re-rendered (unstable props reference)"
+      "severity": "CRITICAL",
+      "anomaly_type": "HYDRATION_MISMATCH_RECOVERY",
+      "root_component": "App",
+      "affected_suspense_boundaries": ["SuspenseList", "SidebarSuspense"],
+      "blocking_duration_ms": 185.4,
+      "trigger_cause": "NON_DETERMINISTIC_MARKUP",
+      "recommendation": "🐸 Hydration mismatch recovery detected. The initial mount took abnormally long with unmounts. Ensure server and client HTML markup match exactly. Avoid browser-only APIs (window, document) or random/time values during initial render, or wrap them in useEffect."
     },
     {
-      "component": "SearchInput",
-      "self_ms": 9.1,
-      "actual_ms": 9.1,
-      "reason": "hook changed"
+      "severity": "WARNING",
+      "anomaly_type": "NESTED_MOUNT_FETCH_WATERFALL",
+      "root_component": "ProfileDetails",
+      "affected_suspense_boundaries": ["ProfileDetails"],
+      "blocking_duration_ms": 120.5,
+      "trigger_cause": "NESTED_MOUNT_FETCH_WATERFALL",
+      "recommendation": "🐸 Suspense Waterfall detected! Boundary <ProfileDetails> took 120.5ms to resolve. Avoid nested Suspense boundaries fetching data sequentially. Prefetch data at the parent level, use Promise.all, or migrate to a data-fetching framework."
     }
   ]
 }
 ```
 
-`is_concurrent_commit: true` means this commit was triggered by `startTransition` or `useDeferredValue`. React intentionally re-renders and discards incomplete trees in these lanes — flagging them as regressions would be wrong.
+---
 
-**Use to understand propagation** — why did 40 components re-render from one click?
+### 5. `evaluate_external_store_performance`
 
-### `suggest_memoization`
+Tracks Zustand/Redux selector reference changes that trigger rapid consecutive renders, and identifies synchronous concurrency bypasses where heavy store updates block high-priority lanes.
 
-Memoization suggestions with viability scores. Not every component with spurious renders benefits from `React.memo` — for components that render in under 2ms, the `Object.is()` comparison overhead can exceed the render cost.
+- **Optional Parameter**: `max_blocking_task_ms` (number, default: `50`).
+
+```json
+{
+  "verdicts": [
+    {
+      "severity": "CRITICAL",
+      "store_hook_id": "useSyncExternalStore",
+      "impacted_components": ["CartSummary"],
+      "longest_sync_task_ms": 12.5,
+      "is_infinite_loop": true,
+      "trigger_cause": "UNSTABLE_SELECTOR_OBJECT_ALLOCATION",
+      "recommendation": "🐸 Unstable store selector! Component <CartSummary> rendered rapidly in consecutive frames (10 times). The selector function likely returns a new object reference on every call. Wrap the selector in useCallback or return primitive values to prevent unnecessary store trigger cycles."
+    },
+    {
+      "severity": "WARNING",
+      "store_hook_id": "useSyncExternalStore",
+      "impacted_components": ["BigStoreProvider"],
+      "longest_sync_task_ms": 68.2,
+      "is_infinite_loop": false,
+      "trigger_cause": "SYNC_CONCURRENCY_BYPASS",
+      "recommendation": "🐸 Concurrency bypass! Heavy synchronous store update took 68.2ms in high-priority lane. Wrap store dispatch or update actions in startTransition to run them concurrently without blocking the main UI thread."
+    }
+  ]
+}
+```
+
+---
+
+### 6. `trace_state_cascade_footprint`
+
+Reconstructs virtual trees to trace propagation depth and the consumer count of updates for a specific commit index, classifying them into Context cascades or Store Subscriber ripples.
+
+- **Required Parameter**: `commit_index` (integer).
+
+```json
+{
+  "verdict": {
+    "severity": "HIGH_FOOTPRINT",
+    "update_trigger_source": "ThemeButton",
+    "propagation_channel": "CONTEXT_PROVIDER",
+    "cascade_render_depth": 7,
+    "rendered_consumer_count": 28,
+    "total_duration_ms": 42.1,
+    "recommendation": "🐸 Context propagation wave! Split the context provider into smaller, more focused providers, or memoize context values and children to prevent re-rendering all consumers on any minor value change."
+  }
+}
+```
+
+---
+
+### 7. `suggest_memoization`
+
+Provides memoization recommendations with ROI viability scores. It flags if a component is too fast (< 2ms average) for memoization, since `Object.is` overhead can exceed render cost.
 
 ```json
 {
@@ -207,30 +259,25 @@ Memoization suggestions with viability scores. Not every component with spurious
       "prop_stability": "UNSTABLE_REFERENCES",
       "recommendation": "DO_NOT_MEMOIZE",
       "reasoning": "avg render time (0.15ms) is below 2ms — React.memo comparison overhead likely exceeds render cost. Fix the unstable reference in the parent instead."
-    },
-    {
-      "component": "DeferredList",
-      "render_count": 8,
-      "spurious_count": 6,
-      "wasted_ms": 24.1,
-      "avg_render_ms": 3.01,
-      "prop_stability": "UNSTABLE_REFERENCES",
-      "recommendation": "INTENTIONAL_CONCURRENT_YIELD",
-      "reasoning": "All spurious renders occurred during startTransition/useDeferredValue commits. React 18 intentionally renders these components multiple times while resolving deferred work — do not add React.memo."
     }
   ]
 }
 ```
 
-- `MEMOIZE` — high ROI, wrap with `React.memo`
-- `DO_NOT_MEMOIZE` — too fast; memo overhead exceeds render cost; fix the parent reference instead
-- `INTENTIONAL_CONCURRENT_YIELD` — React 18 concurrent behavior; do not optimize
+---
+
+### 8. `get_hottest_components` & `trace_render_cascade`
+
+- `get_hottest_components` lists components taking the most CPU self-time.
+- `trace_render_cascade` lists the sequential render chain for any specific commit, showing timing, triggers, and parent-child dependencies.
 
 ---
 
 ## 🚀 Setup
 
 ### Claude Desktop
+
+Add this to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -243,7 +290,7 @@ Memoization suggestions with viability scores. Not every component with spurious
 }
 ```
 
-### Cursor / VS Code / Any MCP client
+### Cursor / VS Code / Other MCP Clients
 
 ```json
 {
@@ -258,36 +305,39 @@ Memoization suggestions with viability scores. Not every component with spurious
 
 ## 📋 How to Export a Profile
 
-1. Open React DevTools in Chrome DevTools
-2. Go to the **Profiler** tab
-3. Click **Record**, interact with your app, click **Stop**
-4. Click the **Save** icon (💾) to export the `.json` file
-5. Pass the absolute path to any tool as `profile_path`
+1. Open React DevTools in Chrome/Firefox DevTools.
+2. Navigate to the **Profiler** tab.
+3. Click **Record**, interact with your application, then click **Stop**.
+4. Click the **Save Profile** icon (💾) to download the `.json` file.
+5. Provide the absolute path to this file as `profile_path` to the MCP tools.
 
 ---
 
-## 🔧 How It Works
+## 🔧 Under the Hood
 
 The parser decodes the React DevTools Profiler export format (version 5):
 
-- **fiberID → component name** from `snapshots` (primary) or the encoded `operations` integer array (fallback)
-- **Spurious render detection** via `changeDescriptions.props === []` — React records an empty array when the props object reference changed but no individual prop keys differed
-- **Context render detection** via `changeDescriptions.context === true` — surfaced separately because React.memo cannot prevent these
-- **Lifecycle tracking** via `isFirstMount` per commit and `TREE_OPERATION_REMOVE` opcodes in the operations array
-- **Concurrent render detection** via `commit.priorityLevel` — `"Low Priority"` and `"Idle"` indicate `startTransition`/`useDeferredValue` lanes
-- **Aggregation** across all commits: total self time, render counts, wasted time per component
+- **Fiber to Name Mapping**: Extracted from `snapshots` (primary) or decoded from `operations` opcodes (fallback).
+- **Spurious Render Math**: Uses `changeDescriptions.props === []` — where React detects a props reference change but no values actually changed.
+- **Concurrent Mode Lane Detection**: Examines `commit.priorityLevel` (`"Low Priority"` / `"Idle"` indicate `startTransition`/`useDeferredValue` lanes) to avoid flagging intentional concurrent yields as regressions.
+- **Virtual Tree Reconstruction**: Builds parent-child and owner relationships using `parentMap` and `operations` ADD/REMOVE opcodes.
 
-No React dependency. No DevTools packages. Pure JSON parsing.
+No React runtime or DevTools dependency is needed. Just fast, pure JSON parsing.
 
 ---
 
-## 📖 Agent Workflow
+## 📖 Recommended Agent Debugging Workflow
+
+To optimize performance systematically, let your agent follow this workflow:
 
 ```
-1. get_render_summary         → understand the scale; spot lifecycle_anomaly (key instability)
-2. find_spurious_renders      → classify root cause: UNSTABLE_PARENT_REF vs CONTEXT_UPDATE vs concurrent_yield
-3. trace_render_cascade       → understand propagation; check is_concurrent_commit before flagging as regression
-4. suggest_memoization        → get verdicts: MEMOIZE / DO_NOT_MEMOIZE / INTENTIONAL_CONCURRENT_YIELD
+1. get_render_summary         → Get high-level overview & detect lifecycle_anomalies (key bugs).
+2. find_spurious_renders      → Map which renders are unnecessary vs context-driven.
+3. analyze_compiler_efficacy  → Check where React Compiler or React.memo is bypassed.
+4. diagnose_hydration_and_suspense → Pinpoint hydration mismatch blocks and nested waterfalls.
+5. evaluate_external_store_performance → Spot Zustand/Redux loops and blocking sync tasks.
+6. trace_state_cascade_footprint → Find the propagation channel & depth of heavy commits.
+7. suggest_memoization        → Get high-ROI React.memo recommendation verdicts.
 ```
 
 ---
@@ -296,8 +346,8 @@ No React dependency. No DevTools packages. Pure JSON parsing.
 
 Built alongside:
 
-- [tailwind-context-resolver-mcp](https://github.com/vola-trebla/tailwind-context-resolver-mcp) — resolve Tailwind design tokens and validate class strings
-- [v8-cpu-profile-decoder-mcp](https://github.com/vola-trebla/v8-cpu-profile-decoder-mcp) — V8 CPU profile analysis for Node.js performance
+- [tailwind-context-resolver-mcp](https://github.com/vola-trebla/tailwind-context-resolver-mcp) — Resolve Tailwind design tokens and validate utility classes.
+- [v8-cpu-profile-decoder-mcp](https://github.com/vola-trebla/v8-cpu-profile-decoder-mcp) — Decode V8 CPU profiles for deep Node.js performance triaging.
 
 ---
 
