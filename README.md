@@ -5,238 +5,116 @@
 [![CI](https://github.com/vola-trebla/react-render-profile-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/vola-trebla/react-render-profile-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An MCP server that decodes React DevTools Profiler exports into **actionable performance diagnostics, interactive SVG cascades, and AST auto-remediations** for AI agents.
-
-Your agent just refactored a context provider or updated state logic. Now 80 components re-render on every keystroke. It has no idea. This server bridges that visual, runtime, and remediation perception gap.
+An **Autonomous Performance SRE & Auto-Remediation Engine** for React, exposed as a Model Context Protocol (MCP) server. Built specifically to bridge the performance perception gap for AI coding agents (Claude, Cursor, Copilot).
 
 ---
 
-## 🤔 The Problem
+## 👁️ The Blind Spot: Why AI Agents Break React Production
 
-AI agents modify React state management, restructure component trees, and refactor context — and they're completely blind to the performance impact.
+When an AI agent refactors a Context Provider, changes state architecture, or hooks up a global store, it is **completely blind** to the runtime performance impact.
 
-The React DevTools Profiler can capture exactly what happened: which components re-rendered, why, and how long it took. But the exported `.json` is a dense structure with Fiber IDs, encoded operations, and microsecond timing data across hundreds of commits.
+An agent can successfully pass unit tests and compile code while introducing catastrophic performance regressions:
 
-```json
-{
-  "version": 5,
-  "dataForRoots": [{
-    "commitData": [{
-      "fiberActualDurations": [[3, 15.2], [4, 8.1], [142, 3.2], ...],
-      "fiberSelfDurations": [[3, 3.9], [4, 4.9], [142, 3.2], ...],
-      "changeDescriptions": { "4": { "props": [], "didHooksChange": false, ... } },
-      ...
-    }],
-    ...
-  }]
-}
-```
+- A single state update cascading into **80 unnecessary child re-renders**.
+- Infinite rendering loops triggered by **unstable Zustand/Redux selector references**.
+- **Hydration mismatches** forcing React to throw away server-rendered HTML and mount from scratch.
+- **Unstable `key` props** causing components to unmount and mount on every render cycle (lifecycle anomalies).
 
-The agent can't parse this. Even if it could, it can't run the aggregation to identify which components are wasting renders — it's raw tick data, not a performance summary. And once a bottleneck is found, the agent must spend time manually rewriting AST trees to hoist static literals or add hooks.
+**`react-render-profile-mcp` gives AI agents a "third eye" to dynamically measure, visualize, and auto-remediate these performance bottlenecks.**
 
 ---
 
-## ✅ The Solution
+## ⚡ The Four Pillars of AI-SRE
 
-This MCP server loads the profiler export and gives agents exactly what they need:
+Instead of raw JSON dumps, this server organizes performance data into structured, actionable insights across four core engineering pillars:
 
-- **Render Summaries & Lifecycle Anomaly Detection**: Spotting components being destroyed/recreated (unstable `key` prop) instead of updated.
-- **Spurious Renders Classification**: Labeling triggers (`UNSTABLE_PARENT_REF`, `CONTEXT_UPDATE`, `INTENTIONAL_CONCURRENT_YIELD`).
-- **Next-Gen SRE Diagnostic Tools**: Checking React Compiler efficacy, client-side hydration mismatches, Suspense waterfalls, Zustand/Redux selector loops, and update cascade propagation depths.
-- **Interactive SVG Cascades**: Generating parent-child render cascades via MCP Resource Templates.
-- **AST Auto-Remediation**: Hoisting static object/array literals, wrapping dynamic variables in `useCallback` / `useMemo`, and adding `React.memo` based on calculated ROI scores.
-- **RSC Flight Stream Profiling**: Auditing payload size (>50KB), request waterfalls, and scanning for prototype traversal hazards like **CVE-2025-55182 (React2Shell)**.
+### 🧠 1. AST Auto-Remediation Engine (`ts-morph`)
 
----
+ア When a bottleneck is found, the agent doesn't need to manually rewrite code. The server can mutate component source code on disk:
 
-## 🛠️ MCP Tools & Resources
+- **Hoisting**: Statically hoisting object and array literals out of render bodies.
+- **Dynamic Memoization**: Wrapping unstable functions and variables in `useCallback` and `useMemo` with computed dependency arrays.
+- **ROI Wrapping**: Wrapping components in `React.memo` only if the profiled self-time and spurious render count justify the comparison overhead (ROI > 1.5).
+- **Rule Auditing**: Scanning code to prevent compiler bailouts (detecting `Date.now()`, `Math.random()`, or render-phase `useRef` mutations).
 
-### Interactive Resources
+### 📊 2. Interactive SVG Cascade Visualizer (MCP Resource)
 
-#### `react-profile-cascade`
+Generates parent-child rendering graphs directly into the agent's chat window using the custom resource URI scheme `react-profile://commits/{commitId}/cascade?profile_path={profile_path}`.
 
-Dynamic SVG flowchart visualizer representing rendering cascades for a React commit.
-
-- **URI Template**: `react-profile://commits/{commitId}/cascade?profile_path={profile_path}`
-- Distinct HSL colors indicate triggering propagation channels:
+- Triggers are styled with distinct HSL palettes to isolate propagation channels:
   - 🔵 **Context Trigger**: Blue (ocean wave)
-  - 🟠 **Zustand/Store Subscription**: Orange (subscriber ripple)
+  - 🟠 **Zustand/Redux Store**: Orange (subscriber ripple)
   - 🔴 **Props Invalidation**: Red (reference mismatch)
   - 🟢 **State Change**: Green (emerald trigger source)
 
----
+### 🛡️ 3. RSC Flight Stream & Security Profiler
 
-### Profiler Data Tools
+Analyzes React Server Components (RSC) Flight streams to optimize delivery:
 
-#### 1. `get_render_summary`
+- Identifies bloated chunks (> 50KB) and sequential waterfalls.
+- Scans payloads for prototype traversal vulnerabilities like **CVE-2025-55182 (React2Shell)** exploits.
 
-Provides a high-level overview: total commits, total render time, top 5 slowest components, and total spurious render count. Each component includes lifecycle counts so the agent can spot key-instability patterns.
+### ⚛️ 4. Multi-Layer Trace Correlator
 
-```json
-{
-  "total_commits": 24,
-  "total_render_ms": 312.4,
-  "total_spurious_renders": 18,
-  "top_components": [
-    {
-      "component": "ProductList",
-      "render_count": 24,
-      "mount_count": 1,
-      "unmount_count": 0,
-      "update_count": 23,
-      "lifecycle_anomaly": false,
-      "total_self_ms": 89.2,
-      "pct_of_total": 28.55
-    },
-    {
-      "component": "ListItem",
-      "render_count": 20,
-      "mount_count": 20,
-      "unmount_count": 19,
-      "update_count": 0,
-      "lifecycle_anomaly": true,
-      "total_self_ms": 61.1,
-      "pct_of_total": 19.56
-    }
-  ]
-}
-```
+Aligns React commits with Chrome Performance timeline events using `blink.user_timing` markers.
 
-- `lifecycle_anomaly: true` indicates that a component is unmounted and mounted again on every commit instead of updating (a sign of unstable or index-based `key` props).
+- Measures post-commit layout, paint, and style calculation tasks to calculate real Core Web Vitals impacts (CLS / INP estimates).
 
 ---
 
-#### 2. `find_spurious_renders`
+## 🛠️ MCP Tools Reference
 
-Identifies components that re-rendered unnecessarily, with the root cause classified so the agent knows the correct fix.
+Below is a compact summary of the tools exposed by this server. All tools accept a required `profile_path` pointing to a React DevTools export `.json`.
 
-```json
-{
-  "spurious_renders": [
-    {
-      "component": "ProductList",
-      "render_count": 24,
-      "spurious_count": 23,
-      "wasted_ms": 84.3,
-      "render_trigger": "UNSTABLE_PARENT_REF",
-      "concurrent_yield": false,
-      "recommendation": "Wrap with React.memo — re-renders are driven by unstable object/function/array references from the parent."
-    }
-  ]
-}
+| Tool Name                                 | Parameters                                                   | Purpose / Output                                                                                                              |
+| :---------------------------------------- | :----------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| **`get_render_summary`**                  | `profile_path`                                               | Overview of commits, total render time, spurious renders count, and lifecycle anomalies.                                      |
+| **`find_spurious_renders`**               | `profile_path`, `min_render_count`?                          | Lists components that rendered with identical props/state. Classifies trigger into `UNSTABLE_PARENT_REF` or `CONTEXT_UPDATE`. |
+| **`analyze_compiler_efficacy`**           | `profile_path`, `invalid_threshold`?                         | Computes Invalidation Index to identify where React Compiler or `React.memo` is bypassed.                                     |
+| **`diagnose_hydration_and_suspense`**     | `profile_path`, `waterfall_threshold_ms`?                    | Detects server-client hydration mismatches and nested Suspense fetch waterfalls.                                              |
+| **`evaluate_external_store_performance`** | `profile_path`, `max_blocking_task_ms`?                      | Finds unstable useSyncExternalStore selectors and high-priority blocking sync tasks.                                          |
+| **`trace_state_cascade_footprint`**       | `profile_path`, `commit_index`                               | Traces virtual owner tree to measure propagation depth and consumer count of updates.                                         |
+| **`suggest_memoization`**                 | `profile_path`, `min_wasted_ms`?                             | Provides high-ROI `React.memo` suggestions based on average self-time (> 2ms threshold).                                      |
+| **`remediate_component`**                 | `file_path`, `component_name`, `unstable_props`, `roi_score` | Modifies AST on disk to hoist variables, wrap hooks, and apply memoization.                                                   |
+| **`audit_compiler_rules`**                | `file_path`, `component_name`                                | Statically audits component source code for React Compiler rule violations.                                                   |
+| **`profile_rsc_stream`**                  | `stream_payload`                                             | Parses RSC Flight logs to audit chunk sizes, waterfalls, and `React2Shell` exploits.                                          |
+| **`correlate_chrome_trace`**              | `profile_path`, `trace_path`                                 | Aligns React commits with Chrome trace events to calculate CLS/INP web vitals impacts.                                        |
+
+---
+
+## 🤖 Prompt Injection: Teach Your Agent to Profile
+
+To get the most out of this server, add the following prompt to your agent's system instructions (e.g., in `.cursorrules`, Cursor System Prompt, or Claude Custom Instructions):
+
+```markdown
+You are equipped with `react-render-profile-mcp`. Use it systematically whenever:
+
+1. You make structural changes to React components, global state providers, or store selectors.
+2. The user reports lag, slow input response, or UI stuttering.
+3. You refactor context providers, Zustand selectors, or Redux dispatches.
+
+Debugging Workflow:
+
+- Ask the user to record and export a React DevTools profile (.json).
+- Run `get_render_summary` to understand the scale of the problem and look for `lifecycle_anomaly: true` (unstable keys).
+- Run `find_spurious_renders` and `analyze_compiler_efficacy` to pinpoint unstable prop references.
+- Call the `react-profile://commits/{commitId}/cascade` resource to visualize cascades.
+- Use `remediate_component` to automatically apply AST optimizations (hoisting static variables, wrapping hooks) instead of doing it manually.
 ```
 
 ---
 
-#### 3. `analyze_compiler_efficacy`
+## 📋 How to Export a Profile
 
-Computes the **Invalidation Index** ($I = \frac{S_{spurious}}{S_{total}} \times T_{spurious\_ms}$) to highlight where manual `React.memo` or React Compiler (React 19) fails due to inline object allocations.
-
-- **Optional Parameter**: `invalid_threshold` (number, default: `10`).
-
----
-
-#### 4. `diagnose_hydration_and_suspense`
-
-Catches client-side hydration mismatches (where React discards server-rendered HTML and mounts the tree from scratch) and monitors spacing between consecutive Suspense resolves to flag sequential nested mount fetch waterfalls.
-
-- **Optional Parameter**: `waterfall_threshold_ms` (number, default: `100`).
+1. Open **React DevTools** in your browser.
+2. Navigate to the **Profiler** tab.
+3. Click the **Record** button (circle), interact with your application to trigger the performance issue, and click **Stop**.
+4. Click the **Save Profile** icon (💾) to download the `.json` file.
+5. Provide the absolute path to this file to the MCP server.
 
 ---
 
-#### 5. `evaluate_external_store_performance`
-
-Tracks Zustand/Redux selector reference changes that trigger rapid consecutive renders, and identifies synchronous concurrency bypasses where heavy store updates block high-priority lanes.
-
-- **Optional Parameter**: `max_blocking_task_ms` (number, default: `50`).
-
----
-
-#### 6. `trace_state_cascade_footprint`
-
-Reconstructs virtual trees to trace propagation depth and the consumer count of updates for a specific commit index.
-
-- **Required Parameter**: `commit_index` (integer).
-
----
-
-#### 7. `suggest_memoization`
-
-Provides memoization recommendations with ROI viability scores. It flags if a component is too fast (< 2ms average) for memoization, since `Object.is` overhead can exceed render cost.
-
----
-
-#### 8. `get_hottest_components` & `trace_render_cascade`
-
-- `get_hottest_components` lists components taking the most CPU self-time.
-- `trace_render_cascade` lists the sequential render chain for any specific commit, showing timing, triggers, and parent-child dependencies.
-
----
-
-### Remediation & Advanced Tools
-
-#### 9. `remediate_component`
-
-Automatically optimizes a React component's AST on disk using `ts-morph`:
-
-- **Hoisting**: Move static array and object literals out of render scope.
-- **Hook Wrapping**: Wrap unstable variables/closures in `useCallback` / `useMemo` with computed dependency arrays.
-- **Memoization Wrapping**: Wraps the component declaration in `React.memo` if its profiling ROI score exceeds `1.5`.
-
-```json
-// Parameters
-{
-  "file_path": "/path/to/Component.tsx",
-  "component_name": "ProductList",
-  "unstable_props": "items, filterOptions, onItemClick",
-  "roi_score": 2.4
-}
-```
-
----
-
-#### 10. `audit_compiler_rules`
-
-Statically audits a component file on disk to identify violations of compiler-safety rules (Date.now(), Math.random(), useRef mutations during render body, or `"use no memo"` directives).
-
-```json
-// Parameters
-{
-  "file_path": "/path/to/Component.tsx",
-  "component_name": "ProductList"
-}
-```
-
----
-
-#### 11. `profile_rsc_stream`
-
-Analyzes raw line-separated React Server Components (RSC) Flight stream payloads. Detects heavy chunks (> 50KB), sequential loading waterfalls, and scans for prototype traversal hazards like **CVE-2025-55182 (React2Shell)** exploits.
-
-```json
-// Parameters
-{
-  "stream_payload": "1:I{\"id\":\"./src/components/List.tsx\",\"name\":\"\"}\n2:J[\"$\",\"div\",null,...]\n"
-}
-```
-
----
-
-#### 12. `correlate_chrome_trace`
-
-Aligns React profiler commits with Chrome timeline trace events using `blink.user_timing` ⚛ markers to measure direct layout/paint durations and Core Web Vitals (INP/CLS) impacts.
-
-```json
-// Parameters
-{
-  "profile_path": "/path/to/profile.json",
-  "trace_path": "/path/to/chrometrace.json"
-}
-```
-
----
-
-## 🚀 Setup
+## ⚙️ Setup & Installation
 
 ### Claude Desktop
 
@@ -253,66 +131,29 @@ Add this to your `claude_desktop_config.json`:
 }
 ```
 
-### Cursor / VS Code / Other MCP Clients
+### Cursor / VS Code / Other Clients
 
-```json
-{
-  "react-render-profile": {
-    "command": "npx",
-    "args": ["-y", "react-render-profile-mcp"]
-  }
-}
-```
+Add an MCP server of type `command`:
 
----
-
-## 📋 How to Export a Profile
-
-1. Open React DevTools in Chrome/Firefox DevTools.
-2. Navigate to the **Profiler** tab.
-3. Click **Record**, interact with your application, then click **Stop**.
-4. Click the **Save Profile** icon (💾) to download the `.json` file.
-5. Provide the absolute path to this file as `profile_path` to the MCP tools.
+- **Command**: `npx -y react-render-profile-mcp`
 
 ---
 
 ## 🔧 Under the Hood
 
-The parser decodes the React DevTools Profiler export format (version 5):
-
-- **Fiber to Name Mapping**: Extracted from `snapshots` (primary) or decoded from `operations` opcodes (fallback).
-- **Spurious Render Math**: Uses `changeDescriptions.props === []` — where React detects a props reference change but no values actually changed.
-- **Concurrent Mode Lane Detection**: Examines `commit.priorityLevel` (`"Low Priority"` / `"Idle"` indicate `startTransition`/`useDeferredValue` lanes) to avoid flagging intentional concurrent yields as regressions.
-- **Virtual Tree Reconstruction**: Builds parent-child and owner relationships using `parentMap` and `operations` ADD/REMOVE opcodes.
-- **AST Modification Safeguards**: Employs `ts-morph` block statements replacement to prevent `forgotten node` AST compiler errors during code updates.
-
-No React runtime or DevTools dependency is needed. Just fast, pure JSON parsing and static AST analysis.
-
----
-
-## 📖 Recommended Agent Debugging Workflow
-
-To optimize performance systematically, let your agent follow this workflow:
-
-```
-1. get_render_summary         → Get high-level overview & detect lifecycle_anomalies (key bugs).
-2. find_spurious_renders      → Map which renders are unnecessary vs context-driven.
-3. analyze_compiler_efficacy  → Check where React Compiler or React.memo is bypassed.
-4. diagnose_hydration_and_suspense → Pinpoint hydration mismatch blocks and nested waterfalls.
-5. evaluate_external_store_performance → Spot Zustand/Redux loops and blocking sync tasks.
-6. trace_state_cascade_footprint → Find the propagation channel & depth of heavy commits.
-7. suggest_memoization        → Get high-ROI React.memo recommendation verdicts.
-8. remediate_component        → Automate hoisting and hook memoization rewrites.
-```
+- **ESM-Native**: Built with TypeScript ESM, optimized for fast Node.js imports.
+- **React DevTools v5 Protocol**: Natively decodes serialized operations arrays, resolving fiber snapshots and name maps.
+- **Lane Identification**: Distinguishes between high-priority lane updates and concurrent transition commits (Low Priority/Idle) to prevent false-positive regression flags.
+- **AST Modification Safety**: Implements `ts-morph` statement manipulation blocks, avoiding common parser state corruption during multi-pass rewrites.
 
 ---
 
 ## 🐸 Part of the MCP Toolbelt
 
-Built alongside:
+Developed alongside:
 
 - [tailwind-context-resolver-mcp](https://github.com/vola-trebla/tailwind-context-resolver-mcp) — Resolve Tailwind design tokens and validate utility classes.
-- [v8-cpu-profile-decoder-mcp](https://github.com/vola-trebla/v8-cpu-profile-decoder-mcp) — Decode V8 CPU profiles for deep Node.js performance triaging.
+- [v8-cpu-profile-decoder-mcp](https://github.com/vola-trebla/v8-cpu-profile-decoder-mcp) — Decode V8 CPU profiles for Node.js backend performance tuning.
 
 ---
 
