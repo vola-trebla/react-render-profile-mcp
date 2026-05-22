@@ -84,6 +84,10 @@ export interface ProfileData {
   metrics: ComponentMetrics[];
   commits: ProfileCommit[];
   nameMap: Map<number, string>;
+  typeMap: Map<number, number>;
+  parentMap: Map<number, number>;
+  childrenMap: Map<number, number[]>;
+  ownerMap: Map<number, number>;
 }
 
 // Tool result types
@@ -157,4 +161,56 @@ export interface MemoSuggestionsResult {
       | "INTENTIONAL_CONCURRENT_YIELD";
     reasoning: string;
   }>;
+}
+
+export interface CompilerEfficacyResult {
+  verdicts: Array<{
+    severity: "CRITICAL" | "WARNING" | "INFO";
+    component_name: string;
+    target_file_path: string;
+    ineffective_render_count: number;
+    wasted_ms: number;
+    trigger_cause: "UNSTABLE_PARENT_PROP_REFERENCE" | "INLINE_SPREAD_OPERATOR";
+    recommendation: string;
+  }>;
+}
+
+export interface HydrationSuspenseResult {
+  verdicts: Array<{
+    severity: "CRITICAL" | "WARNING";
+    anomaly_type:
+      | "HYDRATION_MISMATCH_RECOVERY"
+      | "NESTED_MOUNT_FETCH_WATERFALL";
+    root_component: string;
+    affected_suspense_boundaries: string[];
+    blocking_duration_ms: number;
+    trigger_cause: "NON_DETERMINISTIC_MARKUP" | "NESTED_MOUNT_FETCH_WATERFALL";
+    recommendation: string;
+  }>;
+}
+
+export interface ExternalStoreResult {
+  verdicts: Array<{
+    severity: "CRITICAL" | "WARNING";
+    store_hook_id: string;
+    impacted_components: string[];
+    longest_sync_task_ms: number;
+    is_infinite_loop: boolean;
+    trigger_cause:
+      | "UNSTABLE_SELECTOR_OBJECT_ALLOCATION"
+      | "SYNC_CONCURRENCY_BYPASS";
+    recommendation: string;
+  }>;
+}
+
+export interface StateCascadeResult {
+  verdict: {
+    severity: "HIGH_FOOTPRINT" | "NORMAL";
+    update_trigger_source: string;
+    propagation_channel: "CONTEXT_PROVIDER" | "GRANULAR_STORE_SUBSCRIBER";
+    cascade_render_depth: number;
+    rendered_consumer_count: number;
+    total_duration_ms: number;
+    recommendation: string;
+  } | null;
 }

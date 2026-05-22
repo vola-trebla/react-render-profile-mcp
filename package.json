@@ -1,6 +1,6 @@
 {
   "name": "react-render-profile-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server that decodes React DevTools Profiler exports into actionable render summaries for AI agents",
   "type": "module",
   "main": "dist/index.js",
