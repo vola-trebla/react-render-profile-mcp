@@ -10,10 +10,16 @@ import {
   traceRenderCascade,
   suggestMemoization,
 } from "./analyzer.js";
+import {
+  analyzeCompilerEfficacy,
+  diagnoseHydrationAndSuspense,
+  evaluateExternalStorePerformance,
+  traceStateCascadeFootprint,
+} from "./diagnostics.js";
 
 const server = new McpServer({
   name: "react-render-profile-mcp",
-  version: "0.2.0",
+  version: "0.3.0",
 });
 
 function errorResponse(err: unknown) {
@@ -209,6 +215,168 @@ server.registerTool(
             type: "text",
             text: JSON.stringify(
               suggestMemoization(data, min_wasted_ms),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "analyze_compiler_efficacy",
+  {
+    description:
+      "Evaluates React Compiler or manual React.memo efficacy by tracking spurious renders. " +
+      "Calculates the Invalidation Index for each component to identify where unstable " +
+      "prop references trigger wasteful renders.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      invalid_threshold: z
+        .number()
+        .optional()
+        .describe(
+          "Minimum invalidation index threshold to report (default: 10)",
+        ),
+    },
+  },
+  async ({ profile_path, invalid_threshold }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              analyzeCompilerEfficacy(data, invalid_threshold),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "diagnose_hydration_and_suspense",
+  {
+    description:
+      "Detects server-client hydration mismatches and sequential nested Suspense waterfalls " +
+      "by analyzing mount durations, unmount events, and timelines.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      waterfall_threshold_ms: z
+        .number()
+        .optional()
+        .describe(
+          "Timeline delta threshold in ms to detect Suspense waterfalls (default: 100)",
+        ),
+    },
+  },
+  async ({ profile_path, waterfall_threshold_ms }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              diagnoseHydrationAndSuspense(data, waterfall_threshold_ms),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "evaluate_external_store_performance",
+  {
+    description:
+      "Analyzes useSyncExternalStore performance, identifying selector reference instability " +
+      "and concurrency bypasses where heavy store updates block the high-priority main thread.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      max_blocking_task_ms: z
+        .number()
+        .optional()
+        .describe(
+          "Maximum duration budget in ms for synchronous tasks before flagging bypass (default: 50)",
+        ),
+    },
+  },
+  async ({ profile_path, max_blocking_task_ms }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              evaluateExternalStorePerformance(data, max_blocking_task_ms),
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return errorResponse(err);
+    }
+  },
+);
+
+server.registerTool(
+  "trace_state_cascade_footprint",
+  {
+    description:
+      "Reconstructs the virtual parent/owner tree traversal to measure the depth and consumer " +
+      "count of a state update cascade for a specific commit index.",
+    inputSchema: {
+      profile_path: z
+        .string()
+        .describe(
+          "Absolute path to the React DevTools Profiler export (.json)",
+        ),
+      commit_index: z
+        .number()
+        .describe("Zero-based index of the commit to trace"),
+    },
+  },
+  async ({ profile_path, commit_index }) => {
+    try {
+      const data = await loadProfile(profile_path);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              traceStateCascadeFootprint(data, commit_index),
               null,
               2,
             ),

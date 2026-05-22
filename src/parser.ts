@@ -13,6 +13,9 @@ import type {
 interface OperationsResult {
   nameMap: Map<number, string>;
   unmountCounts: Map<number, number>;
+  typeMap: Map<number, number>;
+  parentMap: Map<number, number>;
+  ownerMap: Map<number, number>;
 }
 
 // Decodes the React DevTools operations integer array.
@@ -23,7 +26,11 @@ interface OperationsResult {
 function decodeOperations(operations: number[]): OperationsResult {
   const nameMap = new Map<number, string>();
   const unmountCounts = new Map<number, number>();
-  if (operations.length < 3) return { nameMap, unmountCounts };
+  const typeMap = new Map<number, number>();
+  const parentMap = new Map<number, number>();
+  const ownerMap = new Map<number, number>();
+  if (operations.length < 3)
+    return { nameMap, unmountCounts, typeMap, parentMap, ownerMap };
 
   let i = 0;
   i += 2; // skip rendererID, rootFiberID
@@ -43,13 +50,16 @@ function decodeOperations(operations: number[]): OperationsResult {
       case 1: {
         // TREE_OPERATION_ADD
         const id = operations[i++];
-        i++; // type
-        i++; // parentID
-        i++; // ownerID
+        const type = operations[i++];
+        const parentID = operations[i++];
+        const ownerID = operations[i++];
         const nameIdx = operations[i++];
         i++; // keyIdx
         if (nameIdx > 0 && nameIdx < strings.length)
           nameMap.set(id, strings[nameIdx]);
+        typeMap.set(id, type);
+        parentMap.set(id, parentID);
+        ownerMap.set(id, ownerID);
         break;
       }
       case 2: {
@@ -88,25 +98,48 @@ function decodeOperations(operations: number[]): OperationsResult {
         break;
       }
       default:
-        return { nameMap, unmountCounts }; // unknown opcode — stop parsing safely
+        return { nameMap, unmountCounts, typeMap, parentMap, ownerMap }; // unknown opcode — stop parsing safely
     }
   }
 
-  return { nameMap, unmountCounts };
+  return { nameMap, unmountCounts, typeMap, parentMap, ownerMap };
 }
 
 interface RootData {
   nameMap: Map<number, string>;
   unmountCounts: Map<number, number>;
+  typeMap: Map<number, number>;
+  parentMap: Map<number, number>;
+  childrenMap: Map<number, number[]>;
+  ownerMap: Map<number, number>;
+}
+
+export function getComponentType(
+  id: number,
+  typeMap: Map<number, number>,
+  name: string,
+): number {
+  if (typeMap.has(id)) return typeMap.get(id)!;
+  if (name.endsWith("Provider")) return 2; // ElementTypeContext
+  if (name.endsWith("Consumer")) return 5; // ElementTypeFunction
+  if (name.includes("Memo") || name.startsWith("Memo(")) return 8; // ElementTypeMemo
+  if (name === "Suspense") return 12; // ElementTypeSuspense
+  return 5; // Default to ElementTypeFunction
 }
 
 function buildRootData(root: ProfileRoot): RootData {
   const nameMap = new Map<number, string>();
   let unmountCounts = new Map<number, number>();
+  const typeMap = new Map<number, number>();
+  const parentMap = new Map<number, number>();
+  const childrenMap = new Map<number, number[]>();
+  const ownerMap = new Map<number, number>();
 
   // Primary source: snapshots (most reliable, human-readable)
   for (const [id, snapshot] of root.snapshots) {
     if (snapshot.displayName) nameMap.set(id, snapshot.displayName);
+    if (snapshot.parentID) parentMap.set(id, snapshot.parentID);
+    if (snapshot.children) childrenMap.set(id, snapshot.children);
   }
 
   // Always decode operations — needed for unmount counts even when snapshots cover names
@@ -114,6 +147,18 @@ function buildRootData(root: ProfileRoot): RootData {
     try {
       const result = decodeOperations(root.operations);
       unmountCounts = result.unmountCounts;
+      for (const [id, type] of result.typeMap) typeMap.set(id, type);
+      for (const [id, parent] of result.parentMap) parentMap.set(id, parent);
+      for (const [id, owner] of result.ownerMap) ownerMap.set(id, owner);
+
+      // Reconstruct childrenMap from parentMap if snapshots were empty
+      if (childrenMap.size === 0) {
+        for (const [id, parent] of parentMap) {
+          if (!childrenMap.has(parent)) childrenMap.set(parent, []);
+          childrenMap.get(parent)!.push(id);
+        }
+      }
+
       // Only use name fallback when snapshots didn't cover names
       if (nameMap.size === 0) {
         for (const [id, name] of result.nameMap) nameMap.set(id, name);
@@ -123,15 +168,24 @@ function buildRootData(root: ProfileRoot): RootData {
     }
   }
 
-  // Always collect names from updaters (available in every commit)
+  // Always collect names and types from updaters (available in every commit)
   for (const commit of root.commitData) {
     for (const updater of commit.updaters ?? []) {
       if (updater.displayName && updater.id)
         nameMap.set(updater.id, updater.displayName);
+      if (updater.type !== undefined && updater.id)
+        typeMap.set(updater.id, updater.type);
     }
   }
 
-  return { nameMap, unmountCounts };
+  return {
+    nameMap,
+    unmountCounts,
+    typeMap,
+    parentMap,
+    childrenMap,
+    ownerMap,
+  };
 }
 
 function classifyReason(
@@ -283,12 +337,25 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
   const allCommits: ProfileCommit[] = [];
   const allMetrics = new Map<number, ComponentMetrics>();
   const nameMap = new Map<number, string>();
+  const typeMap = new Map<number, number>();
+  const parentMap = new Map<number, number>();
+  const childrenMap = new Map<number, number[]>();
+  const ownerMap = new Map<number, number>();
 
   for (const root of profile.dataForRoots) {
-    const { nameMap: rootNames, unmountCounts } = buildRootData(root);
-    for (const [id, name] of rootNames) nameMap.set(id, name);
+    const rootData = buildRootData(root);
+    for (const [id, name] of rootData.nameMap) nameMap.set(id, name);
+    for (const [id, type] of rootData.typeMap) typeMap.set(id, type);
+    for (const [id, parent] of rootData.parentMap) parentMap.set(id, parent);
+    for (const [id, owner] of rootData.ownerMap) ownerMap.set(id, owner);
+    for (const [id, children] of rootData.childrenMap)
+      childrenMap.set(id, children);
 
-    for (const m of aggregateMetrics(root.commitData, nameMap, unmountCounts)) {
+    for (const m of aggregateMetrics(
+      root.commitData,
+      nameMap,
+      rootData.unmountCounts,
+    )) {
       const existing = allMetrics.get(m.fiberID);
       if (existing) {
         existing.renderCount += m.renderCount;
@@ -321,5 +388,9 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
     metrics: Array.from(allMetrics.values()),
     commits: allCommits,
     nameMap,
+    typeMap,
+    parentMap,
+    childrenMap,
+    ownerMap,
   };
 }
