@@ -309,12 +309,32 @@ export async function loadProfile(profilePath: string): Promise<ProfileData> {
     throw new Error(`Profile file not found: ${profilePath}`);
 
   const raw = await readFile(profilePath, "utf-8");
-  const profile = JSON.parse(raw) as ReactProfile;
+
+  let profile: ReactProfile;
+  try {
+    profile = JSON.parse(raw) as ReactProfile;
+  } catch (err) {
+    throw new Error(
+      `Invalid JSON format in profile file: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  if (!profile || typeof profile !== "object") {
+    throw new Error("Invalid profile: root is not a JSON object");
+  }
+
+  if (profile.version === undefined) {
+    throw new Error("Invalid profile: missing version property");
+  }
 
   if (profile.version !== 5) {
     throw new Error(
       `Unsupported profile version: ${profile.version}. Only React DevTools Profiler export version 5 is supported.`,
     );
+  }
+
+  if (!Array.isArray(profile.dataForRoots)) {
+    throw new Error("Invalid profile: missing dataForRoots array");
   }
 
   // Real DevTools exports serialize changeDescriptions as [[fiberID, desc], ...] (Map.entries()).

@@ -38,6 +38,46 @@ describe("loadProfile", () => {
     );
   });
 
+  it("throws on empty file", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/empty-profile.json";
+    await writeFile(tmp, "");
+    await expect(loadProfile(tmp)).rejects.toThrow(
+      "Invalid JSON format in profile file",
+    );
+    await unlink(tmp);
+  });
+
+  it("throws on corrupt json", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/corrupt-profile.json";
+    await writeFile(tmp, "{ invalid json }");
+    await expect(loadProfile(tmp)).rejects.toThrow(
+      "Invalid JSON format in profile file",
+    );
+    await unlink(tmp);
+  });
+
+  it("throws on missing version", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/missing-version.json";
+    await writeFile(tmp, JSON.stringify({ dataForRoots: [] }));
+    await expect(loadProfile(tmp)).rejects.toThrow(
+      "Invalid profile: missing version property",
+    );
+    await unlink(tmp);
+  });
+
+  it("throws on missing dataForRoots", async () => {
+    const { writeFile, unlink } = await import("fs/promises");
+    const tmp = "/tmp/missing-roots.json";
+    await writeFile(tmp, JSON.stringify({ version: 5 }));
+    await expect(loadProfile(tmp)).rejects.toThrow(
+      "Invalid profile: missing dataForRoots array",
+    );
+    await unlink(tmp);
+  });
+
   it("throws on unsupported version", async () => {
     const { writeFile, unlink } = await import("fs/promises");
     const tmp = "/tmp/bad-version.json";
