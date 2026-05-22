@@ -5,7 +5,7 @@ import {
   ChromeTraceEvent,
 } from "../src/correlator.js";
 
-describe("Timeline Trace Correlator 🐸", () => {
+describe("Timeline Trace Correlator", () => {
   it("aligns timeline and calculates style, layout, paint, CLS and INP estimates", () => {
     // Commit starts at 10ms, duration 20ms
     const commits: ReactCommit[] = [

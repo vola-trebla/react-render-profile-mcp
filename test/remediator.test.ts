@@ -5,7 +5,7 @@ import { writeFile, unlink } from "fs/promises";
 import { ASTPerformanceRemediator } from "../src/remediator.js";
 import { CompilerEfficacyAuditor } from "../src/compilerAuditor.js";
 
-describe("AST Performance Remediator & Compiler Auditor 🐸", () => {
+describe("AST Performance Remediator & Compiler Auditor", () => {
   it("hoists static declarations, wraps callbacks in useCallback, and wraps in React.memo if ROI justifies", async () => {
     const filePath = resolve(
       fileURLToPath(import.meta.url),

@@ -1,4 +1,4 @@
-# react-render-profile-mcp 🐸⚡
+# react-render-profile-mcp
 
 [![npm version](https://img.shields.io/npm/v/react-render-profile-mcp.svg)](https://www.npmjs.com/package/react-render-profile-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/react-render-profile-mcp.svg)](https://www.npmjs.com/package/react-render-profile-mcp)
@@ -148,7 +148,7 @@ Add an MCP server of type `command`:
 
 ---
 
-## 🐸 Part of the MCP Toolbelt
+## Part of the MCP Toolbelt
 
 Developed alongside:
 

@@ -15,7 +15,7 @@ const FIXTURE_BASIC = resolve(
   "../../test/fixtures/basic.profile.json",
 );
 
-describe("Diagnostics Engine 🐸", () => {
+describe("Diagnostics Engine", () => {
   describe("analyzeCompilerEfficacy", () => {
     it("reports warnings/critical for high invalidation index", async () => {
       const data = await loadProfile(FIXTURE_BASIC);

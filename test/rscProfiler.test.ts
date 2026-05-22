@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { RSCStreamingProfiler } from "../src/rscProfiler.js";
 
-describe("RSC Streaming Profiler 🐸", () => {
+describe("RSC Streaming Profiler", () => {
   it("parses and profiles a standard RSC Flight stream log", () => {
     const payload = `
 1:I{"id":"./src/components/ClientComp.tsx","name":""}

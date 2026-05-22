@@ -9,7 +9,7 @@ import type {
 
 /**
  * Computes the Invalidation Index and maps spurious renders of Memo/Function components.
- * 🐸 Ribbit! Help find where React 19 compiler or manual memoization fails due to unstable prop references!
+ * Help find where React 19 compiler or manual memoization fails due to unstable prop references!
  */
 export function analyzeCompilerEfficacy(
   profileData: ProfileData,
@@ -43,7 +43,7 @@ export function analyzeCompilerEfficacy(
         ineffective_render_count: m.spuriousRenderCount,
         wasted_ms: m.spuriousWastedMs,
         trigger_cause: "UNSTABLE_PARENT_PROP_REFERENCE",
-        recommendation: `🐸 Ineffective rendering detected! Component <${m.name}> has a high invalidation index (${invalidationIndex.toFixed(2)}) due to spurious renders. Memoize parent component props using useMemo/useCallback or hoist static objects out of the parent's render function to stabilize references.`,
+        recommendation: `Ineffective rendering detected! Component <${m.name}> has a high invalidation index (${invalidationIndex.toFixed(2)}) due to spurious renders. Memoize parent component props using useMemo/useCallback or hoist static objects out of the parent's render function to stabilize references.`,
       });
     }
   }
@@ -53,7 +53,7 @@ export function analyzeCompilerEfficacy(
 
 /**
  * Detects hydration mismatches and tracks Suspense waterfalls based on timeline/commit deltas.
- * 🐸 Wet feet alert! Don't let server-client mismatches or slow Suspense chains slow down the user!
+ * Don't let server-client mismatches or slow Suspense chains slow down the user!
  */
 export function diagnoseHydrationAndSuspense(
   profileData: ProfileData,
@@ -98,7 +98,7 @@ export function diagnoseHydrationAndSuspense(
         blocking_duration_ms: firstCommit.duration,
         trigger_cause: "NON_DETERMINISTIC_MARKUP",
         recommendation:
-          "🐸 Hydration mismatch recovery detected. The initial mount took abnormally long with unmounts. Ensure server and client HTML markup match exactly. Avoid browser-only APIs (window, document) or random/time values during initial render, or wrap them in useEffect.",
+          "Hydration mismatch recovery detected. The initial mount took abnormally long with unmounts. Ensure server and client HTML markup match exactly. Avoid browser-only APIs (window, document) or random/time values during initial render, or wrap them in useEffect.",
       });
     }
   }
@@ -136,7 +136,7 @@ export function diagnoseHydrationAndSuspense(
           affected_suspense_boundaries: [sName],
           blocking_duration_ms: diff,
           trigger_cause: "NESTED_MOUNT_FETCH_WATERFALL",
-          recommendation: `🐸 Suspense Waterfall detected! Boundary <${sName}> took ${diff.toFixed(1)}ms to resolve. Avoid nested Suspense boundaries fetching data sequentially. Prefetch data at the parent level, use Promise.all, or migrate to a data-fetching framework.`,
+          recommendation: `Suspense Waterfall detected! Boundary <${sName}> took ${diff.toFixed(1)}ms to resolve. Avoid nested Suspense boundaries fetching data sequentially. Prefetch data at the parent level, use Promise.all, or migrate to a data-fetching framework.`,
         });
       }
     }
@@ -147,7 +147,7 @@ export function diagnoseHydrationAndSuspense(
 
 /**
  * Analyzes useSyncExternalStore performance, selector instability, and synchronous bypasses.
- * 🐸 Redux/Zustand store speed check! Don't let selectors flood your renders!
+ * Redux/Zustand store speed check! Don't let selectors flood your renders!
  */
 export function evaluateExternalStorePerformance(
   profileData: ProfileData,
@@ -205,7 +205,7 @@ export function evaluateExternalStorePerformance(
         longest_sync_task_ms: maxTaskMs,
         is_infinite_loop: unstableSequences > 8,
         trigger_cause: "UNSTABLE_SELECTOR_OBJECT_ALLOCATION",
-        recommendation: `🐸 Unstable store selector! Component <${m.name}> rendered rapidly in consecutive frames (${unstableSequences} times). The selector function likely returns a new object reference on every call. Wrap the selector in useCallback or return primitive values to prevent unnecessary store trigger cycles.`,
+        recommendation: `Unstable store selector! Component <${m.name}> rendered rapidly in consecutive frames (${unstableSequences} times). The selector function likely returns a new object reference on every call. Wrap the selector in useCallback or return primitive values to prevent unnecessary store trigger cycles.`,
       });
     }
   }
@@ -248,7 +248,7 @@ export function evaluateExternalStorePerformance(
           longest_sync_task_ms: commit.duration,
           is_infinite_loop: false,
           trigger_cause: "SYNC_CONCURRENCY_BYPASS",
-          recommendation: `🐸 Concurrency bypass! Heavy synchronous store update took ${commit.duration.toFixed(1)}ms in high-priority lane. Wrap store dispatch or update actions in startTransition to run them concurrently without blocking the main UI thread.`,
+          recommendation: `Concurrency bypass! Heavy synchronous store update took ${commit.duration.toFixed(1)}ms in high-priority lane. Wrap store dispatch or update actions in startTransition to run them concurrently without blocking the main UI thread.`,
         });
       }
     }
@@ -259,7 +259,7 @@ export function evaluateExternalStorePerformance(
 
 /**
  * Reconstructs the render cascade traversal for a specific commit and counts affected consumers.
- * 🐸 Follow the ripples! See how a single state change causes a wave of re-renders.
+ * Trace the ripples! See how a single state change causes a wave of re-renders.
  */
 export function traceStateCascadeFootprint(
   profileData: ProfileData,
@@ -334,8 +334,8 @@ export function traceStateCascadeFootprint(
     : "GRANULAR_STORE_SUBSCRIBER";
 
   const recommendation = hasContextUpdate
-    ? "🐸 Context propagation wave! Split the context provider into smaller, more focused providers, or memoize context values and children to prevent re-rendering all consumers on any minor value change."
-    : "🐸 Subscriber cascade footprint! Re-renders are driven by store selectors. Use more granular selectors, or verify if the component is subscribing to too much state.";
+    ? "Context propagation wave! Split the context provider into smaller, more focused providers, or memoize context values and children to prevent re-rendering all consumers on any minor value change."
+    : "Subscriber cascade footprint! Re-renders are driven by store selectors. Use more granular selectors, or verify if the component is subscribing to too much state.";
 
   return {
     verdict: {
