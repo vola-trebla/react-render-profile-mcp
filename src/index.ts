@@ -28,7 +28,7 @@ import {
 
 const server = new McpServer({
   name: "react-render-profile-mcp",
-  version: "1.0.1",
+  version: "1.0.2",
 });
 
 function errorResponse(err: unknown) {
